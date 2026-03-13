@@ -1,0 +1,984 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>A-Frame - Grand Dining Room</title>
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <style>
+      :root {
+        --ink: #2b1d16;
+        --ivory: #f4ecde;
+        --gold: #c9a454;
+        --burgundy: #5a1f24;
+        --oak: #5d3a25;
+      }
+
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        font-family: "Georgia", "Times New Roman", serif;
+        background: radial-gradient(
+          circle at 20% 10%,
+          #fff3db 0%,
+          #e5cda2 26%,
+          #7a5538 72%,
+          #2f1c13 100%
+        );
+      }
+
+      #hud {
+        position: fixed;
+        top: 12px;
+        left: 12px;
+        z-index: 9;
+        max-width: min(90vw, 420px);
+        color: var(--ivory);
+        background: linear-gradient(
+          135deg,
+          rgb(40 20 14 / 85%),
+          rgb(86 29 35 / 82%)
+        );
+        border: 1px solid rgb(201 164 84 / 70%);
+        border-radius: 14px;
+        padding: 12px 14px;
+        box-shadow: 0 10px 30px rgb(0 0 0 / 35%);
+        backdrop-filter: blur(4px);
+      }
+
+      #hud h1 {
+        margin: 0 0 6px;
+        font-size: clamp(15px, 2.2vw, 20px);
+        letter-spacing: 0.06em;
+        color: #ffde94;
+      }
+
+      #hud p {
+        margin: 0;
+        font-size: clamp(12px, 1.8vw, 14px);
+        line-height: 1.45;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="hud">
+      <h1>Grand Dining Room</h1>
+      <p>
+        Move with WASD or arrow keys. Look around with mouse or touch drag. Your
+        dining set remains fully interactive and model-free. Tonight: signature
+        gala atmosphere.
+      </p>
+    </div>
+
+    <a-scene
+      renderer="colorManagement: true; physicallyCorrectLights: true"
+      shadow="type: pcfsoft"
+      fog="type: exponential; color: #1d1410; density: 0.022"
+    >
+      <!-- Player rig: movement and look-controls preserved -->
+      <a-entity id="rig" position="0 0 2" wasd-controls="acceleration: 42">
+        <a-entity
+          id="camera"
+          camera="fov: 72"
+          position="0 1.63 0"
+          look-controls
+        >
+          <a-entity
+            cursor="fuse: false; rayOrigin: mouse"
+            raycaster="objects: .interactable"
+          ></a-entity>
+        </a-entity>
+      </a-entity>
+
+      <!-- Environment shell -->
+      <a-sky color="#170f0c"></a-sky>
+      <a-plane
+        rotation="-90 0 0"
+        width="28"
+        height="28"
+        color="#4a301f"
+        shadow="receive: true"
+      ></a-plane>
+
+      <!-- Carpet under table for depth -->
+      <a-plane
+        position="0 0.01 -4"
+        rotation="-90 0 0"
+        width="7"
+        height="5"
+        color="#5a1f24"
+        shadow="receive: true"
+      ></a-plane>
+      <a-ring
+        position="0 0.012 -4"
+        rotation="-90 0 0"
+        radius-inner="1.6"
+        radius-outer="2.25"
+        color="#c9a454"
+      ></a-ring>
+
+      <!-- Walls and ceiling -->
+      <a-box
+        position="0 2.1 -10"
+        width="18"
+        height="4.2"
+        depth="0.3"
+        color="#d7c7ae"
+      ></a-box>
+      <a-box
+        position="-9 2.1 -4"
+        width="0.3"
+        height="4.2"
+        depth="12"
+        color="#ccb89e"
+      ></a-box>
+      <a-box
+        position="9 2.1 -4"
+        width="0.3"
+        height="4.2"
+        depth="12"
+        color="#ccb89e"
+      ></a-box>
+      <a-box
+        position="0 4.2 -4"
+        width="18"
+        height="0.3"
+        depth="12"
+        color="#efe5d2"
+      ></a-box>
+
+      <!-- ===== Left bar — Alcoholic Drinks ===== -->
+      <!-- Counter -->
+      <a-box
+        position="-8.1 0.55 -4"
+        width="1.4"
+        depth="4.4"
+        height="1.1"
+        color="#5d3a25"
+        shadow="cast: true; receive: true"
+      ></a-box>
+      <!-- Polished counter-top -->
+      <a-box
+        position="-8.1 1.11 -4"
+        width="1.5"
+        depth="4.6"
+        height="0.06"
+        color="#1a1a1a"
+        shadow="cast: true"
+      ></a-box>
+      <!-- Back shelf rack against wall -->
+      <a-box
+        position="-8.7 1.55 -4"
+        width="0.18"
+        depth="4.2"
+        height="0.8"
+        color="#4a2d1d"
+      ></a-box>
+      <a-box
+        position="-8.7 1.95 -4"
+        width="0.22"
+        depth="4.2"
+        height="0.04"
+        color="#6d452b"
+      ></a-box>
+      <a-box
+        position="-8.7 1.55 -4"
+        width="0.22"
+        depth="4.2"
+        height="0.04"
+        color="#6d452b"
+      ></a-box>
+      <!-- Bottles row (decorative) -->
+      <a-cylinder
+        position="-8.65 1.72 -2.7"
+        radius="0.06"
+        height="0.3"
+        color="#2e7d32"
+      ></a-cylinder>
+      <a-cylinder
+        position="-8.65 1.72 -3.2"
+        radius="0.06"
+        height="0.34"
+        color="#8b0000"
+      ></a-cylinder>
+      <a-cylinder
+        position="-8.65 1.72 -3.7"
+        radius="0.06"
+        height="0.28"
+        color="#c9a454"
+      ></a-cylinder>
+      <a-cylinder
+        position="-8.65 1.72 -4.3"
+        radius="0.06"
+        height="0.32"
+        color="#5a1f24"
+      ></a-cylinder>
+      <a-cylinder
+        position="-8.65 1.72 -4.8"
+        radius="0.06"
+        height="0.3"
+        color="#2e4a1f"
+      ></a-cylinder>
+      <a-cylinder
+        position="-8.65 1.72 -5.3"
+        radius="0.06"
+        height="0.34"
+        color="#a04820"
+      ></a-cylinder>
+      <!-- Glasses on counter -->
+      <a-cylinder
+        position="-8.1 1.18 -3.0"
+        radius="0.04"
+        height="0.11"
+        color="#d4f1ff"
+        material="opacity: 0.7; transparent: true"
+      ></a-cylinder>
+      <a-cylinder
+        position="-8.1 1.18 -3.5"
+        radius="0.04"
+        height="0.11"
+        color="#d4f1ff"
+        material="opacity: 0.7; transparent: true"
+      ></a-cylinder>
+      <a-cylinder
+        position="-8.1 1.18 -4.5"
+        radius="0.04"
+        height="0.11"
+        color="#d4f1ff"
+        material="opacity: 0.7; transparent: true"
+      ></a-cylinder>
+      <a-cylinder
+        position="-8.1 1.18 -5.0"
+        radius="0.04"
+        height="0.11"
+        color="#d4f1ff"
+        material="opacity: 0.7; transparent: true"
+      ></a-cylinder>
+      <!-- Warm bar light -->
+      <a-entity
+        light="type: point; color: #ffcc77; intensity: 0.6; distance: 5; decay: 2"
+        position="-8.1 2.0 -4"
+      ></a-entity>
+      <!-- Label -->
+      <a-entity position="-8.1 2.15 -4" rotation="0 90 0">
+        <a-text
+          value="Alcoholic Drinks"
+          align="center"
+          color="#ffde94"
+          width="3.5"
+          font="mozillavr"
+        ></a-text>
+      </a-entity>
+
+      <!-- ===== Right bar — Soft Drinks ===== -->
+      <!-- Counter -->
+      <a-box
+        position="8.1 0.55 -4"
+        width="1.4"
+        depth="4.4"
+        height="1.1"
+        color="#5d3a25"
+        shadow="cast: true; receive: true"
+      ></a-box>
+      <!-- Polished counter-top -->
+      <a-box
+        position="8.1 1.11 -4"
+        width="1.5"
+        depth="4.6"
+        height="0.06"
+        color="#1a1a1a"
+        shadow="cast: true"
+      ></a-box>
+      <!-- Back shelf rack against wall -->
+      <a-box
+        position="8.7 1.55 -4"
+        width="0.18"
+        depth="4.2"
+        height="0.8"
+        color="#4a2d1d"
+      ></a-box>
+      <a-box
+        position="8.7 1.95 -4"
+        width="0.22"
+        depth="4.2"
+        height="0.04"
+        color="#6d452b"
+      ></a-box>
+      <a-box
+        position="8.7 1.55 -4"
+        width="0.22"
+        depth="4.2"
+        height="0.04"
+        color="#6d452b"
+      ></a-box>
+      <!-- Bottles row (decorative) -->
+      <a-cylinder
+        position="8.65 1.72 -2.7"
+        radius="0.06"
+        height="0.3"
+        color="#ff6f00"
+      ></a-cylinder>
+      <a-cylinder
+        position="8.65 1.72 -3.2"
+        radius="0.06"
+        height="0.32"
+        color="#e53935"
+      ></a-cylinder>
+      <a-cylinder
+        position="8.65 1.72 -3.7"
+        radius="0.06"
+        height="0.28"
+        color="#1565c0"
+      ></a-cylinder>
+      <a-cylinder
+        position="8.65 1.72 -4.3"
+        radius="0.06"
+        height="0.3"
+        color="#ffeb3b"
+      ></a-cylinder>
+      <a-cylinder
+        position="8.65 1.72 -4.8"
+        radius="0.06"
+        height="0.34"
+        color="#43a047"
+      ></a-cylinder>
+      <a-cylinder
+        position="8.65 1.72 -5.3"
+        radius="0.06"
+        height="0.28"
+        color="#e040fb"
+      ></a-cylinder>
+      <!-- Glasses on counter -->
+      <a-cylinder
+        position="8.1 1.18 -3.0"
+        radius="0.04"
+        height="0.11"
+        color="#d4f1ff"
+        material="opacity: 0.7; transparent: true"
+      ></a-cylinder>
+      <a-cylinder
+        position="8.1 1.18 -3.5"
+        radius="0.04"
+        height="0.11"
+        color="#d4f1ff"
+        material="opacity: 0.7; transparent: true"
+      ></a-cylinder>
+      <a-cylinder
+        position="8.1 1.18 -4.5"
+        radius="0.04"
+        height="0.11"
+        color="#d4f1ff"
+        material="opacity: 0.7; transparent: true"
+      ></a-cylinder>
+      <a-cylinder
+        position="8.1 1.18 -5.0"
+        radius="0.04"
+        height="0.11"
+        color="#d4f1ff"
+        material="opacity: 0.7; transparent: true"
+      ></a-cylinder>
+      <!-- Cool bar light -->
+      <a-entity
+        light="type: point; color: #aadcff; intensity: 0.6; distance: 5; decay: 2"
+        position="8.1 2.0 -4"
+      ></a-entity>
+      <!-- Label -->
+      <a-entity position="8.1 2.15 -4" rotation="0 -90 0">
+        <a-text
+          value="Soft Drinks"
+          align="center"
+          color="#aadcff"
+          width="3.5"
+          font="mozillavr"
+        ></a-text>
+      </a-entity>
+
+      <!-- Wall trims -->
+      <a-box
+        position="0 0.95 -9.85"
+        width="18"
+        height="0.18"
+        depth="0.15"
+        color="#6d452b"
+      ></a-box>
+      <a-box
+        position="0 2.6 -9.85"
+        width="18"
+        height="0.14"
+        depth="0.15"
+        color="#6d452b"
+      ></a-box>
+
+      <!-- Decorative columns to frame the hall -->
+      <a-cylinder
+        position="-6.8 1.5 -8.9"
+        radius="0.24"
+        height="3"
+        color="#ead8bb"
+        shadow="cast: true"
+      ></a-cylinder>
+      <a-cylinder
+        position="6.8 1.5 -8.9"
+        radius="0.24"
+        height="3"
+        color="#ead8bb"
+        shadow="cast: true"
+      ></a-cylinder>
+      <a-cylinder
+        position="-6.8 1.5 -1.1"
+        radius="0.24"
+        height="3"
+        color="#ead8bb"
+        shadow="cast: true"
+      ></a-cylinder>
+      <a-cylinder
+        position="6.8 1.5 -1.1"
+        radius="0.24"
+        height="3"
+        color="#ead8bb"
+        shadow="cast: true"
+      ></a-cylinder>
+      <a-torus
+        position="-6.8 3.01 -8.9"
+        radius="0.29"
+        radius-tubular="0.045"
+        color="#c9a454"
+        rotation="90 0 0"
+      ></a-torus>
+      <a-torus
+        position="6.8 3.01 -8.9"
+        radius="0.29"
+        radius-tubular="0.045"
+        color="#c9a454"
+        rotation="90 0 0"
+      ></a-torus>
+      <a-torus
+        position="-6.8 3.01 -1.1"
+        radius="0.29"
+        radius-tubular="0.045"
+        color="#c9a454"
+        rotation="90 0 0"
+      ></a-torus>
+      <a-torus
+        position="6.8 3.01 -1.1"
+        radius="0.29"
+        radius-tubular="0.045"
+        color="#c9a454"
+        rotation="90 0 0"
+      ></a-torus>
+
+      <!-- Window-like insets with moon glow -->
+      <a-plane
+        position="-4.6 2.2 -9.83"
+        width="2.4"
+        height="2.1"
+        color="#2f3f59"
+      ></a-plane>
+      <a-plane
+        position="4.6 2.2 -9.83"
+        width="2.4"
+        height="2.1"
+        color="#2f3f59"
+      ></a-plane>
+      <a-box
+        position="-4.6 2.2 -9.8"
+        width="2.45"
+        height="2.15"
+        depth="0.05"
+        color="#5a3a29"
+      ></a-box>
+      <a-box
+        position="4.6 2.2 -9.8"
+        width="2.45"
+        height="2.15"
+        depth="0.05"
+        color="#5a3a29"
+      ></a-box>
+
+      <!-- Fireplace with animated flame core -->
+      <a-box
+        position="0 0.95 -9.72"
+        width="2.25"
+        height="1.7"
+        depth="0.2"
+        color="#c8ae8a"
+      ></a-box>
+      <a-box
+        position="0 0.95 -9.64"
+        width="1.45"
+        height="1.1"
+        depth="0.18"
+        color="#2a1a13"
+      ></a-box>
+      <a-box
+        position="0 1.62 -9.62"
+        width="2.7"
+        height="0.12"
+        depth="0.45"
+        color="#6d452b"
+      ></a-box>
+      <a-cone
+        position="0 0.63 -9.58"
+        radius-bottom="0.2"
+        radius-top="0.02"
+        height="0.42"
+        color="#ff8a1d"
+        animation="property: position; from: 0 0.58 -9.58; to: 0 0.7 -9.58; dir: alternate; loop: true; dur: 700; easing: easeInOutSine"
+        animation__flare="property: scale; from: 1 1 1; to: 1.25 1.35 1.25; dir: alternate; loop: true; dur: 650"
+      ></a-cone>
+      <a-sphere
+        position="0.1 0.54 -9.58"
+        radius="0.09"
+        color="#ffd672"
+        animation="property: position; from: 0.14 0.52 -9.58; to: -0.12 0.58 -9.58; dir: alternate; loop: true; dur: 920; easing: easeInOutSine"
+      ></a-sphere>
+      <a-entity
+        light="type: point; color: #ff9a32; intensity: 1.1; distance: 6; decay: 2"
+        position="0 0.75 -9.45"
+      ></a-entity>
+
+      <!-- Lighting stack: warm interior + cool moon fill -->
+      <a-entity
+        light="type: ambient; intensity: 0.3; color: #ffe6ba"
+      ></a-entity>
+      <a-entity
+        light="type: directional; intensity: 0.45; color: #a8c9ff"
+        position="-4 4 -9"
+        rotation="-35 30 0"
+      ></a-entity>
+
+      <a-entity
+        id="chandelier-light"
+        position="0 3.1 -4"
+        light="type: point; intensity: 1.45; distance: 16; decay: 2; color: #ffd08c"
+        animation="property: light.intensity; from: 1.35; to: 1.65; dur: 1800; dir: alternate; loop: true; easing: easeInOutSine"
+      ></a-entity>
+
+      <!-- Accent side lights for cinematic contrast -->
+      <a-entity
+        light="type: spot; color: #ffe2ad; intensity: 0.85; angle: 28; penumbra: 0.45; distance: 18"
+        position="-7.5 3.6 -4"
+        rotation="-16 64 0"
+      ></a-entity>
+      <a-entity
+        light="type: spot; color: #ffe2ad; intensity: 0.85; angle: 28; penumbra: 0.45; distance: 18"
+        position="7.5 3.6 -4"
+        rotation="-16 -64 0"
+      ></a-entity>
+
+      <!-- Chandelier geometry -->
+      <a-cylinder
+        position="0 3.85 -4"
+        radius="0.03"
+        height="0.7"
+        color="#d7b77a"
+      ></a-cylinder>
+      <a-torus
+        position="0 3.35 -4"
+        radius="0.55"
+        radius-tubular="0.03"
+        color="#b08b48"
+      ></a-torus>
+      <a-sphere position="0 3.35 -4" radius="0.08" color="#e5c37e"></a-sphere>
+      <a-sphere position="0.45 3.3 -4" radius="0.06" color="#ffdca2"></a-sphere>
+      <a-sphere
+        position="-0.45 3.3 -4"
+        radius="0.06"
+        color="#ffdca2"
+      ></a-sphere>
+      <a-sphere position="0 3.3 -3.55" radius="0.06" color="#ffdca2"></a-sphere>
+      <a-sphere position="0 3.3 -4.45" radius="0.06" color="#ffdca2"></a-sphere>
+
+      <!-- Grand table (kept central object) -->
+      <a-box
+        id="table-top"
+        class="interactable"
+        position="0 0.78 -4"
+        width="2.4"
+        depth="1.3"
+        height="0.14"
+        color="#6b4229"
+        shadow="cast: true; receive: true"
+      ></a-box>
+
+      <a-box
+        position="0 0.86 -4"
+        width="2.1"
+        depth="1.08"
+        height="0.01"
+        color="#efe5d2"
+      ></a-box>
+      <a-box
+        position="0 0.865 -4"
+        width="0.09"
+        depth="1.08"
+        height="0.012"
+        color="#d8c7ad"
+      ></a-box>
+
+      <!-- Floating crystal centerpiece above the table -->
+      <a-entity
+        position="0 1.35 -4"
+        animation="property: rotation; to: 0 360 0; loop: true; dur: 12000; easing: linear"
+      >
+        <a-octahedron
+          radius="0.12"
+          color="#7cc9ff"
+          material="metalness: 0.35; roughness: 0.12; emissive: #2c6ca0; emissiveIntensity: 0.18"
+        ></a-octahedron>
+        <a-ring
+          radius-inner="0.22"
+          radius-outer="0.245"
+          rotation="90 0 0"
+          color="#c9a454"
+        ></a-ring>
+        <a-ring
+          radius-inner="0.22"
+          radius-outer="0.245"
+          rotation="0 0 0"
+          color="#c9a454"
+        ></a-ring>
+      </a-entity>
+      <a-entity
+        position="0 1.35 -4"
+        light="type: point; color: #88d0ff; intensity: 0.5; distance: 5; decay: 2"
+        animation="property: light.intensity; from: 0.3; to: 0.62; dir: alternate; loop: true; dur: 2400; easing: easeInOutSine"
+      ></a-entity>
+
+      <!-- Table legs -->
+      <a-cylinder
+        position="1.05 0.37 -3.42"
+        radius="0.06"
+        height="0.74"
+        color="#4a2d1d"
+        shadow="cast: true"
+      ></a-cylinder>
+      <a-cylinder
+        position="-1.05 0.37 -3.42"
+        radius="0.06"
+        height="0.74"
+        color="#4a2d1d"
+        shadow="cast: true"
+      ></a-cylinder>
+      <a-cylinder
+        position="1.05 0.37 -4.58"
+        radius="0.06"
+        height="0.74"
+        color="#4a2d1d"
+        shadow="cast: true"
+      ></a-cylinder>
+      <a-cylinder
+        position="-1.05 0.37 -4.58"
+        radius="0.06"
+        height="0.74"
+        color="#4a2d1d"
+        shadow="cast: true"
+      ></a-cylinder>
+
+      <!-- Chairs remain interactable and now look more ornate -->
+      <a-entity class="interactable" position="-1.75 0 -4" rotation="0 90 0">
+        <a-box
+          position="0 0.48 0"
+          width="0.56"
+          depth="0.56"
+          height="0.09"
+          color="#5b3623"
+          shadow="cast: true; receive: true"
+        ></a-box>
+        <a-box
+          position="0 0.88 -0.22"
+          width="0.56"
+          depth="0.09"
+          height="0.74"
+          color="#5b3623"
+          shadow="cast: true"
+        ></a-box>
+        <a-box
+          position="0 0.53 0"
+          width="0.42"
+          depth="0.42"
+          height="0.03"
+          color="#9b2635"
+        ></a-box>
+        <a-cylinder
+          position="-0.21 0.23 0.21"
+          radius="0.035"
+          height="0.47"
+          color="#3b2417"
+        ></a-cylinder>
+        <a-cylinder
+          position="0.21 0.23 0.21"
+          radius="0.035"
+          height="0.47"
+          color="#3b2417"
+        ></a-cylinder>
+        <a-cylinder
+          position="-0.21 0.23 -0.21"
+          radius="0.035"
+          height="0.47"
+          color="#3b2417"
+        ></a-cylinder>
+        <a-cylinder
+          position="0.21 0.23 -0.21"
+          radius="0.035"
+          height="0.47"
+          color="#3b2417"
+        ></a-cylinder>
+      </a-entity>
+
+      <a-entity class="interactable" position="1.75 0 -4" rotation="0 -90 0">
+        <a-box
+          position="0 0.48 0"
+          width="0.56"
+          depth="0.56"
+          height="0.09"
+          color="#5b3623"
+          shadow="cast: true; receive: true"
+        ></a-box>
+        <a-box
+          position="0 0.88 -0.22"
+          width="0.56"
+          depth="0.09"
+          height="0.74"
+          color="#5b3623"
+          shadow="cast: true"
+        ></a-box>
+        <a-box
+          position="0 0.53 0"
+          width="0.42"
+          depth="0.42"
+          height="0.03"
+          color="#9b2635"
+        ></a-box>
+        <a-cylinder
+          position="-0.21 0.23 0.21"
+          radius="0.035"
+          height="0.47"
+          color="#3b2417"
+        ></a-cylinder>
+        <a-cylinder
+          position="0.21 0.23 0.21"
+          radius="0.035"
+          height="0.47"
+          color="#3b2417"
+        ></a-cylinder>
+        <a-cylinder
+          position="-0.21 0.23 -0.21"
+          radius="0.035"
+          height="0.47"
+          color="#3b2417"
+        ></a-cylinder>
+        <a-cylinder
+          position="0.21 0.23 -0.21"
+          radius="0.035"
+          height="0.47"
+          color="#3b2417"
+        ></a-cylinder>
+      </a-entity>
+
+      <!-- Required tabletop items preserved -->
+      <a-cylinder
+        id="milo"
+        class="interactable"
+        position="-0.3 0.91 -4"
+        radius="0.13"
+        height="0.24"
+        color="#2e7d32"
+        shadow="cast: true"
+      ></a-cylinder>
+      <a-ring
+        position="-0.3 1.03 -4"
+        radius-inner="0.08"
+        radius-outer="0.13"
+        rotation="-90 0 0"
+        color="#f5cf87"
+      ></a-ring>
+      <a-entity position="-0.3 1.065 -4">
+        <a-text value="MiLo" align="center" color="#fff" width="0.9"></a-text>
+      </a-entity>
+
+      <a-cylinder
+        id="milk"
+        class="interactable"
+        position="0.28 0.93 -4"
+        radius="0.12"
+        height="0.28"
+        color="#ffffff"
+        shadow="cast: true"
+      ></a-cylinder>
+      <a-ring
+        position="0.28 1.07 -4"
+        radius-inner="0.07"
+        radius-outer="0.12"
+        rotation="-90 0 0"
+        color="#7fb6ff"
+      ></a-ring>
+      <a-entity position="0.28 1.105 -4">
+        <a-text
+          value="Milk"
+          align="center"
+          color="#2f7ed8"
+          width="0.9"
+        ></a-text>
+      </a-entity>
+
+      <a-cylinder
+        class="interactable"
+        position="-0.68 0.85 -4.02"
+        radius="0.07"
+        height="0.13"
+        color="#f2f2f2"
+        shadow="cast: true"
+      ></a-cylinder>
+      <a-cylinder
+        class="interactable"
+        position="0.68 0.85 -3.98"
+        radius="0.07"
+        height="0.13"
+        color="#f2f2f2"
+        shadow="cast: true"
+      ></a-cylinder>
+
+      <a-cylinder
+        class="interactable"
+        position="0 0.84 -3.65"
+        radius="0.2"
+        height="0.025"
+        color="#ecdcbc"
+        shadow="cast: true"
+      ></a-cylinder>
+
+      <a-cylinder
+        class="interactable"
+        position="0.84 0.87 -3.58"
+        radius="0.08"
+        height="0.16"
+        color="#734a2b"
+        shadow="cast: true"
+      ></a-cylinder>
+      <a-sphere
+        class="interactable"
+        position="0.84 1.04 -3.58"
+        radius="0.12"
+        color="#2d9e55"
+        shadow="cast: true"
+        animation="property: rotation; to: 0 360 0; dur: 9000; easing: linear; loop: true"
+      ></a-sphere>
+
+      <!-- ===== Additional tabletop items ===== -->
+
+      <!-- Glass water jug with handle silhouette -->
+      <a-cylinder position="-0.75 0.91 -3.62" radius="0.09" height="0.2" color="#c5e8f7" material="opacity: 0.55; transparent: true" shadow="cast: true"></a-cylinder>
+      <a-cylinder position="-0.75 1.02 -3.62" radius="0.1" height="0.02" color="#a0d4ea" material="opacity: 0.6; transparent: true"></a-cylinder>
+      <!-- Water inside -->
+      <a-cylinder position="-0.75 0.89 -3.62" radius="0.075" height="0.13" color="#7fbbdd" material="opacity: 0.4; transparent: true"></a-cylinder>
+
+      <!-- Honey / jam jar -->
+      <a-cylinder position="0.6 0.89 -4.35" radius="0.065" height="0.16" color="#e8a832" shadow="cast: true"></a-cylinder>
+      <a-cylinder position="0.6 0.975 -4.35" radius="0.07" height="0.02" color="#d4a032"></a-cylinder>
+      <a-entity position="0.6 1.02 -4.35">
+        <a-text value="Jam" align="center" color="#5a2d0c" width="0.5"></a-text>
+      </a-entity>
+
+      <!-- Sugar bowl -->
+      <a-cylinder position="-0.62 0.87 -4.38" radius="0.08" height="0.1" color="#f5f0e6" shadow="cast: true"></a-cylinder>
+      <a-sphere position="-0.62 0.93 -4.38" radius="0.08" color="#f5f0e6" theta-length="90"></a-sphere>
+      <a-entity position="-0.62 0.97 -4.38">
+        <a-text value="Sugar" align="center" color="#8c7a5c" width="0.45"></a-text>
+      </a-entity>
+
+      <!-- Two extra drinking cups (for the MiLo & Milk) near each chair -->
+      <a-entity position="-0.9 0 -4">
+        <!-- Left cup with saucer -->
+        <a-cylinder position="0 0.84 0" radius="0.11" height="0.015" color="#f5f0e6" shadow="cast: true"></a-cylinder>
+        <a-cylinder position="0 0.87 0" radius="0.055" height="0.1" color="#f8f4ec" shadow="cast: true"></a-cylinder>
+        <!-- Dark liquid inside -->
+        <a-cylinder position="0 0.91 0" radius="0.045" height="0.02" color="#3e2009"></a-cylinder>
+      </a-entity>
+      <a-entity position="0.9 0 -4">
+        <!-- Right cup with saucer -->
+        <a-cylinder position="0 0.84 0" radius="0.11" height="0.015" color="#f5f0e6" shadow="cast: true"></a-cylinder>
+        <a-cylinder position="0 0.87 0" radius="0.055" height="0.1" color="#f8f4ec" shadow="cast: true"></a-cylinder>
+        <!-- Light liquid inside -->
+        <a-cylinder position="0 0.91 0" radius="0.045" height="0.02" color="#f0e0c8"></a-cylinder>
+      </a-entity>
+
+      <!-- Bread basket -->
+      <a-cylinder position="0 0.85 -4.42" radius="0.16" height="0.07" color="#b8863a" shadow="cast: true"></a-cylinder>
+      <a-sphere position="-0.04 0.91 -4.42" radius="0.06" color="#d4a860"></a-sphere>
+      <a-sphere position="0.06 0.91 -4.38" radius="0.055" color="#cfa050"></a-sphere>
+      <a-sphere position="0.01 0.91 -4.47" radius="0.058" color="#c89a48"></a-sphere>
+
+      <!-- Napkin holder -->
+      <a-box position="0.42 0.86 -3.5" width="0.14" depth="0.06" height="0.13" color="#d4c3a8" shadow="cast: true"></a-box>
+      <a-box position="0.42 0.86 -3.5" width="0.12" depth="0.01" height="0.11" color="#f5f0e6"></a-box>
+
+      <!-- Two small spoons beside cups -->
+      <a-cylinder position="-0.98 0.845 -3.88" radius="0.008" height="0.14" color="#c0c0c0" rotation="0 0 90" shadow="cast: true"></a-cylinder>
+      <a-cylinder position="0.98 0.845 -3.88" radius="0.008" height="0.14" color="#c0c0c0" rotation="0 0 90" shadow="cast: true"></a-cylinder>
+
+      <!-- Salt & pepper shakers -->
+      <a-cylinder position="-0.15 0.87 -3.52" radius="0.03" height="0.1" color="#f5f5f5" shadow="cast: true"></a-cylinder>
+      <a-sphere position="-0.15 0.925 -3.52" radius="0.032" color="#e0e0e0"></a-sphere>
+      <a-cylinder position="0.15 0.87 -3.52" radius="0.03" height="0.1" color="#2a2a2a" shadow="cast: true"></a-cylinder>
+      <a-sphere position="0.15 0.925 -3.52" radius="0.032" color="#1a1a1a"></a-sphere>
+
+      <!-- Console cabinet and wall art for upscale atmosphere -->
+      <a-box
+        position="0 0.48 -8.8"
+        width="3.8"
+        height="0.95"
+        depth="0.55"
+        color="#6f462c"
+        shadow="receive: true"
+      ></a-box>
+      <a-box
+        position="0 1.55 -9.7"
+        width="2.8"
+        height="1.1"
+        depth="0.06"
+        color="#ab8f6e"
+      ></a-box>
+      <a-plane
+        position="0 1.55 -9.66"
+        width="2.5"
+        height="0.8"
+        color="#7e1f2b"
+      ></a-plane>
+
+      <!-- Side sculptures for an extraordinary focal silhouette -->
+      <a-entity position="-3.15 0.74 -8.85">
+        <a-cylinder
+          radius="0.22"
+          height="1.48"
+          color="#5d3a25"
+          shadow="cast: true"
+        ></a-cylinder>
+        <a-octahedron
+          position="0 0.86 0"
+          radius="0.24"
+          color="#d2b068"
+          animation="property: rotation; to: 360 360 0; dur: 9000; loop: true; easing: linear"
+        ></a-octahedron>
+      </a-entity>
+
+      <a-entity position="3.15 0.74 -8.85">
+        <a-cylinder
+          radius="0.22"
+          height="1.48"
+          color="#5d3a25"
+          shadow="cast: true"
+        ></a-cylinder>
+        <a-octahedron
+          position="0 0.86 0"
+          radius="0.24"
+          color="#d2b068"
+          animation="property: rotation; to: -360 -360 0; dur: 9000; loop: true; easing: linear"
+        ></a-octahedron>
+      </a-entity>
+    </a-scene>
+  </body>
+</html>
