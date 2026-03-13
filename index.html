@@ -280,6 +280,105 @@
         },
       });
 
+      /* Rain system — falling droplets in a volume */
+      AFRAME.registerComponent("rain-system", {
+        schema: {
+          count: { type: "number", default: 220 },
+          width: { type: "number", default: 16 },
+          depth: { type: "number", default: 10 },
+          height: { type: "number", default: 8 },
+          speed: { type: "number", default: 8 },
+        },
+        init: function () {
+          this.drops = [];
+          var d = this.data;
+          for (var i = 0; i < d.count; i++) {
+            var drop = document.createElement("a-entity");
+            drop.setAttribute(
+              "geometry",
+              "primitive: cylinder; radius: 0.012; height: 0.22",
+            );
+            drop.setAttribute(
+              "material",
+              "color: #aaccee; opacity: 0.45; transparent: true",
+            );
+            var x = (Math.random() - 0.5) * d.width;
+            var y = Math.random() * d.height;
+            var z = (Math.random() - 0.5) * d.depth;
+            drop.setAttribute("position", x + " " + y + " " + z);
+            this.el.appendChild(drop);
+            this.drops.push({
+              el: drop,
+              speed: d.speed * (0.8 + Math.random() * 0.4),
+            });
+          }
+        },
+        tick: function (t, dt) {
+          var sec = dt / 1000;
+          var h = this.data.height;
+          for (var i = 0; i < this.drops.length; i++) {
+            var p = this.drops[i].el.object3D.position;
+            p.y -= this.drops[i].speed * sec;
+            if (p.y < -0.5) {
+              p.y = h;
+              p.x = (Math.random() - 0.5) * this.data.width;
+              p.z = (Math.random() - 0.5) * this.data.depth;
+            }
+          }
+        },
+      });
+
+      /* Lightning flash — periodic bright flash on the outdoor scene */
+      AFRAME.registerComponent("lightning-flash", {
+        init: function () {
+          this.timer = 0;
+          this.nextFlash = 4000 + Math.random() * 8000;
+        },
+        tick: function (t, dt) {
+          this.timer += dt;
+          if (this.timer > this.nextFlash) {
+            this.timer = 0;
+            this.nextFlash = 3000 + Math.random() * 10000;
+            this.flash();
+          }
+        },
+        flash: function () {
+          var el = this.el;
+          el.setAttribute("light", "intensity", 6);
+          playThunder();
+          setTimeout(function () {
+            el.setAttribute("light", "intensity", 0);
+          }, 80);
+          setTimeout(function () {
+            el.setAttribute("light", "intensity", 4);
+          }, 160);
+          setTimeout(function () {
+            el.setAttribute("light", "intensity", 0);
+          }, 220);
+        },
+      });
+
+      /* Tree sway — gentle wind sway animation for outdoor trees */
+      AFRAME.registerComponent("tree-sway", {
+        schema: {
+          amount: { type: "number", default: 3 },
+          speed: { type: "number", default: 2000 },
+        },
+        init: function () {
+          var a = this.data.amount;
+          var d = this.data.speed + Math.random() * 1000;
+          this.el.setAttribute("animation__sway", {
+            property: "rotation",
+            from: "0 0 " + -a,
+            to: "0 0 " + a,
+            dur: d,
+            dir: "alternate",
+            loop: true,
+            easing: "easeInOutSine",
+          });
+        },
+      });
+
       /* Easter egg — click crystal 5 times for a surprise */
       AFRAME.registerComponent("easter-egg", {
         init: function () {
@@ -388,6 +487,56 @@
         } catch (e) {}
       }
 
+      function playThunder() {
+        try {
+          var c = getAudioCtx();
+          var len = c.sampleRate * 1.8;
+          var buf = c.createBuffer(1, len, c.sampleRate);
+          var d = buf.getChannelData(0);
+          for (var i = 0; i < len; i++) {
+            var env = Math.exp(-i / (c.sampleRate * 0.6));
+            d[i] = (Math.random() * 2 - 1) * env;
+          }
+          var src = c.createBufferSource();
+          src.buffer = buf;
+          var g = c.createGain();
+          g.gain.setValueAtTime(0.25, c.currentTime);
+          g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 1.8);
+          var lp = c.createBiquadFilter();
+          lp.type = "lowpass";
+          lp.frequency.value = 300;
+          src.connect(lp);
+          lp.connect(g);
+          g.connect(c.destination);
+          src.start();
+        } catch (e) {}
+      }
+
+      var rainNode = null;
+      function startRainAudio() {
+        if (rainNode) return;
+        try {
+          var c = getAudioCtx();
+          var len = c.sampleRate * 2;
+          var buf = c.createBuffer(1, len, c.sampleRate);
+          var d = buf.getChannelData(0);
+          for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+          rainNode = c.createBufferSource();
+          rainNode.buffer = buf;
+          rainNode.loop = true;
+          var g = c.createGain();
+          g.gain.value = 0.045;
+          var bp = c.createBiquadFilter();
+          bp.type = "bandpass";
+          bp.frequency.value = 800;
+          bp.Q.value = 0.5;
+          rainNode.connect(bp);
+          bp.connect(g);
+          g.connect(c.destination);
+          rainNode.start();
+        } catch (e) {}
+      }
+
       function playFootstep() {
         try {
           var c = getAudioCtx(),
@@ -437,8 +586,22 @@
           n.start();
         } catch (e) {}
       }
-      document.addEventListener("click", startAmbience, { once: true });
-      document.addEventListener("keydown", startAmbience, { once: true });
+      document.addEventListener(
+        "click",
+        function () {
+          startAmbience();
+          startRainAudio();
+        },
+        { once: true },
+      );
+      document.addEventListener(
+        "keydown",
+        function () {
+          startAmbience();
+          startRainAudio();
+        },
+        { once: true },
+      );
 
       /* ========== Status / Day-Night / Photo / Reset ========== */
       function updateStatus(msg) {
@@ -548,7 +711,7 @@
   </head>
   <body>
     <div id="hud">
-      <h1>Grand Dining Room</h1>
+      <h1>Dining Room</h1>
       <p>
         <b>WASD / Arrows:</b> Move &nbsp; <b>Mouse:</b> Look<br />
         <b>Click:</b> Interact &nbsp; <b>N:</b> Day/Night &nbsp; <b>P:</b> Photo
@@ -621,9 +784,75 @@
       ></a-ring>
 
       <!-- Walls and ceiling -->
+      <!-- Back wall — split into sections with window openings -->
+      <!-- Left section (far left to left window) -->
+      <a-box
+        position="-7.9 2.1 -10"
+        width="2.2"
+        height="4.2"
+        depth="0.3"
+        color="#d7c7ae"
+      ></a-box>
+      <!-- Between left window and fireplace -->
+      <a-box
+        position="-2.1 2.1 -10"
+        width="2.5"
+        height="4.2"
+        depth="0.3"
+        color="#d7c7ae"
+      ></a-box>
+      <!-- Above left window -->
+      <a-box
+        position="-4.6 3.55 -10"
+        width="2.6"
+        height="0.9"
+        depth="0.3"
+        color="#d7c7ae"
+      ></a-box>
+      <!-- Below left window -->
+      <a-box
+        position="-4.6 0.55 -10"
+        width="2.6"
+        height="1.1"
+        depth="0.3"
+        color="#d7c7ae"
+      ></a-box>
+      <!-- Center section (fireplace area) -->
       <a-box
         position="0 2.1 -10"
-        width="18"
+        width="1.7"
+        height="4.2"
+        depth="0.3"
+        color="#d7c7ae"
+      ></a-box>
+      <!-- Between fireplace and right window -->
+      <a-box
+        position="2.1 2.1 -10"
+        width="2.5"
+        height="4.2"
+        depth="0.3"
+        color="#d7c7ae"
+      ></a-box>
+      <!-- Above right window -->
+      <a-box
+        position="4.6 3.55 -10"
+        width="2.6"
+        height="0.9"
+        depth="0.3"
+        color="#d7c7ae"
+      ></a-box>
+      <!-- Below right window -->
+      <a-box
+        position="4.6 0.55 -10"
+        width="2.6"
+        height="1.1"
+        depth="0.3"
+        color="#d7c7ae"
+      ></a-box>
+      <!-- Right section (right window to far right) -->
+      <a-box
+        position="7.9 2.1 -10"
+        width="2.2"
         height="4.2"
         depth="0.3"
         color="#d7c7ae"
@@ -970,33 +1199,456 @@
         rotation="90 0 0"
       ></a-torus>
 
-      <!-- Window-like insets with moon glow -->
+      <!-- ============================================= -->
+      <!-- ===== STYLISH STORM WINDOWS + EXTERIOR ===== -->
+      <!-- ============================================= -->
+
+      <!-- LEFT WINDOW — Glass pane (semi-transparent to see through) -->
       <a-plane
-        position="-4.6 2.2 -9.83"
-        width="2.4"
-        height="2.1"
-        color="#2f3f59"
+        position="-4.6 2.2 -9.82"
+        width="2.3"
+        height="2.0"
+        color="#3a506b"
+        material="opacity:0.25; transparent:true; side:double"
       ></a-plane>
-      <a-plane
-        position="4.6 2.2 -9.83"
-        width="2.4"
-        height="2.1"
-        color="#2f3f59"
-      ></a-plane>
+      <!-- Window frame (outer) -->
       <a-box
-        position="-4.6 2.2 -9.8"
-        width="2.45"
-        height="2.15"
-        depth="0.05"
-        color="#5a3a29"
+        position="-4.6 2.2 -9.79"
+        width="2.5"
+        height="2.2"
+        depth="0.08"
+        color="#3e2a16"
+        material="emissive:#1a0e06; emissiveIntensity:0.1"
+      ></a-box>
+      <!-- Muntins (cross bars) -->
+      <a-box
+        position="-4.6 2.2 -9.77"
+        width="0.06"
+        height="2.0"
+        depth="0.04"
+        color="#4a301f"
       ></a-box>
       <a-box
-        position="4.6 2.2 -9.8"
-        width="2.45"
-        height="2.15"
-        depth="0.05"
-        color="#5a3a29"
+        position="-4.6 2.2 -9.77"
+        width="2.3"
+        height="0.06"
+        depth="0.04"
+        color="#4a301f"
       ></a-box>
+      <!-- Arch detail on top -->
+      <a-torus
+        position="-4.6 3.2 -9.78"
+        rotation="0 0 0"
+        radius="1.15"
+        radius-tubular="0.04"
+        theta-start="0"
+        theta-length="180"
+        color="#3e2a16"
+      ></a-torus>
+      <!-- Window sill -->
+      <a-box
+        position="-4.6 1.08 -9.65"
+        width="2.7"
+        height="0.09"
+        depth="0.3"
+        color="#5d3a25"
+      ></a-box>
+      <!-- Curtain rods + drapes -->
+      <a-cylinder
+        position="-4.6 3.32 -9.6"
+        radius="0.025"
+        height="2.8"
+        rotation="0 0 90"
+        color="#8b6914"
+      ></a-cylinder>
+      <a-box
+        position="-5.65 2.15 -9.62"
+        width="0.35"
+        height="2.2"
+        depth="0.04"
+        color="#6b1a24"
+        material="opacity:0.85; transparent:true"
+        animation="property:rotation; from:0 -3 0; to:0 3 0; dur:3500; dir:alternate; loop:true; easing:easeInOutSine"
+      ></a-box>
+      <a-box
+        position="-3.55 2.15 -9.62"
+        width="0.35"
+        height="2.2"
+        depth="0.04"
+        color="#6b1a24"
+        material="opacity:0.85; transparent:true"
+        animation="property:rotation; from:0 3 0; to:0 -3 0; dur:3500; dir:alternate; loop:true; easing:easeInOutSine"
+      ></a-box>
+      <!-- Rain streaks on window glass -->
+      <a-entity position="-4.6 2.2 -9.81">
+        <a-cylinder
+          position="-0.3 0.4 0"
+          radius="0.005"
+          height="0.4"
+          color="#8ab4f8"
+          material="opacity:0.4; transparent:true"
+          animation="property:position; from:-0.3 0.8 0; to:-0.3 -0.6 0; dur:1200; loop:true; easing:linear"
+        ></a-cylinder>
+        <a-cylinder
+          position="0.15 0.2 0"
+          radius="0.005"
+          height="0.35"
+          color="#8ab4f8"
+          material="opacity:0.35; transparent:true"
+          animation="property:position; from:0.15 0.7 0; to:0.15 -0.7 0; dur:1000; loop:true; easing:linear"
+        ></a-cylinder>
+        <a-cylinder
+          position="0.5 0.5 0"
+          radius="0.005"
+          height="0.45"
+          color="#8ab4f8"
+          material="opacity:0.4; transparent:true"
+          animation="property:position; from:0.5 0.9 0; to:0.5 -0.5 0; dur:1400; loop:true; easing:linear"
+        ></a-cylinder>
+        <a-cylinder
+          position="-0.7 0.1 0"
+          radius="0.004"
+          height="0.3"
+          color="#8ab4f8"
+          material="opacity:0.3; transparent:true"
+          animation="property:position; from:-0.7 0.6 0; to:-0.7 -0.6 0; dur:900; loop:true; easing:linear"
+        ></a-cylinder>
+        <a-cylinder
+          position="0.8 0.3 0"
+          radius="0.004"
+          height="0.38"
+          color="#8ab4f8"
+          material="opacity:0.35; transparent:true"
+          animation="property:position; from:0.8 0.8 0; to:0.8 -0.5 0; dur:1100; loop:true; easing:linear"
+        ></a-cylinder>
+      </a-entity>
+
+      <!-- RIGHT WINDOW — Glass pane -->
+      <a-plane
+        position="4.6 2.2 -9.82"
+        width="2.3"
+        height="2.0"
+        color="#3a506b"
+        material="opacity:0.25; transparent:true; side:double"
+      ></a-plane>
+      <!-- Window frame (outer) -->
+      <a-box
+        position="4.6 2.2 -9.79"
+        width="2.5"
+        height="2.2"
+        depth="0.08"
+        color="#3e2a16"
+        material="emissive:#1a0e06; emissiveIntensity:0.1"
+      ></a-box>
+      <!-- Muntins -->
+      <a-box
+        position="4.6 2.2 -9.77"
+        width="0.06"
+        height="2.0"
+        depth="0.04"
+        color="#4a301f"
+      ></a-box>
+      <a-box
+        position="4.6 2.2 -9.77"
+        width="2.3"
+        height="0.06"
+        depth="0.04"
+        color="#4a301f"
+      ></a-box>
+      <!-- Arch detail -->
+      <a-torus
+        position="4.6 3.2 -9.78"
+        rotation="0 0 0"
+        radius="1.15"
+        radius-tubular="0.04"
+        theta-start="0"
+        theta-length="180"
+        color="#3e2a16"
+      ></a-torus>
+      <!-- Window sill -->
+      <a-box
+        position="4.6 1.08 -9.65"
+        width="2.7"
+        height="0.09"
+        depth="0.3"
+        color="#5d3a25"
+      ></a-box>
+      <!-- Curtain rods + drapes -->
+      <a-cylinder
+        position="4.6 3.32 -9.6"
+        radius="0.025"
+        height="2.8"
+        rotation="0 0 90"
+        color="#8b6914"
+      ></a-cylinder>
+      <a-box
+        position="3.55 2.15 -9.62"
+        width="0.35"
+        height="2.2"
+        depth="0.04"
+        color="#6b1a24"
+        material="opacity:0.85; transparent:true"
+        animation="property:rotation; from:0 -3 0; to:0 3 0; dur:3200; dir:alternate; loop:true; easing:easeInOutSine"
+      ></a-box>
+      <a-box
+        position="5.65 2.15 -9.62"
+        width="0.35"
+        height="2.2"
+        depth="0.04"
+        color="#6b1a24"
+        material="opacity:0.85; transparent:true"
+        animation="property:rotation; from:0 3 0; to:0 -3 0; dur:3200; dir:alternate; loop:true; easing:easeInOutSine"
+      ></a-box>
+      <!-- Rain streaks on right window -->
+      <a-entity position="4.6 2.2 -9.81">
+        <a-cylinder
+          position="-0.4 0.3 0"
+          radius="0.005"
+          height="0.4"
+          color="#8ab4f8"
+          material="opacity:0.4; transparent:true"
+          animation="property:position; from:-0.4 0.9 0; to:-0.4 -0.6 0; dur:1100; loop:true; easing:linear"
+        ></a-cylinder>
+        <a-cylinder
+          position="0.2 0.5 0"
+          radius="0.005"
+          height="0.35"
+          color="#8ab4f8"
+          material="opacity:0.35; transparent:true"
+          animation="property:position; from:0.2 0.8 0; to:0.2 -0.7 0; dur:950; loop:true; easing:linear"
+        ></a-cylinder>
+        <a-cylinder
+          position="0.6 0.1 0"
+          radius="0.005"
+          height="0.42"
+          color="#8ab4f8"
+          material="opacity:0.38; transparent:true"
+          animation="property:position; from:0.6 0.7 0; to:0.6 -0.6 0; dur:1300; loop:true; easing:linear"
+        ></a-cylinder>
+        <a-cylinder
+          position="-0.8 0 0"
+          radius="0.004"
+          height="0.3"
+          color="#8ab4f8"
+          material="opacity:0.3; transparent:true"
+          animation="property:position; from:-0.8 0.5 0; to:-0.8 -0.5 0; dur:850; loop:true; easing:linear"
+        ></a-cylinder>
+        <a-cylinder
+          position="0.9 0.4 0"
+          radius="0.004"
+          height="0.36"
+          color="#8ab4f8"
+          material="opacity:0.33; transparent:true"
+          animation="property:position; from:0.9 0.7 0; to:0.9 -0.6 0; dur:1050; loop:true; easing:linear"
+        ></a-cylinder>
+      </a-entity>
+
+      <!-- ===== OUTDOOR STORM SCENE (behind back wall z < -10) ===== -->
+      <!-- Storm sky backdrop -->
+      <a-plane
+        position="0 3 -22"
+        width="40"
+        height="16"
+        color="#1a2133"
+        material="emissive:#0c1220; emissiveIntensity:0.2"
+      ></a-plane>
+      <!-- Dark storm clouds (layered) -->
+      <a-sphere
+        position="-6 6 -18"
+        radius="3.5"
+        color="#2a2a3a"
+        material="opacity:0.7; transparent:true"
+        animation="property:position; from:-6 6 -18; to:-3 6.2 -18; dur:12000; dir:alternate; loop:true; easing:easeInOutSine"
+      ></a-sphere>
+      <a-sphere
+        position="2 5.5 -19"
+        radius="4"
+        color="#22222e"
+        material="opacity:0.65; transparent:true"
+        animation="property:position; from:2 5.5 -19; to:5 5.8 -19; dur:14000; dir:alternate; loop:true; easing:easeInOutSine"
+      ></a-sphere>
+      <a-sphere
+        position="7 6.5 -17"
+        radius="3"
+        color="#2e2e40"
+        material="opacity:0.6; transparent:true"
+        animation="property:position; from:7 6.5 -17; to:4 6.2 -17; dur:10000; dir:alternate; loop:true; easing:easeInOutSine"
+      ></a-sphere>
+      <a-sphere
+        position="-2 7 -20"
+        radius="5"
+        color="#1e1e2c"
+        material="opacity:0.5; transparent:true"
+        animation="property:position; from:-2 7 -20; to:1 7.3 -20; dur:16000; dir:alternate; loop:true; easing:easeInOutSine"
+      ></a-sphere>
+
+      <!-- Ground outside -->
+      <a-plane
+        position="0 -0.1 -16"
+        rotation="-90 0 0"
+        width="30"
+        height="16"
+        color="#1a2e1a"
+      ></a-plane>
+
+      <!-- Lightning light source -->
+      <a-entity
+        position="0 8 -16"
+        light="type:point; color:#c8d8ff; intensity:0; distance:40; decay:1"
+        lightning-flash
+      ></a-entity>
+
+      <!-- RAIN particle system -->
+      <a-entity
+        position="0 5 -15"
+        rain-system="count:280; width:20; depth:12; height:10; speed:9"
+      ></a-entity>
+
+      <!-- ===== Swaying storm trees ===== -->
+      <!-- Tree 1 (left-center) -->
+      <a-entity position="-5 0 -14" tree-sway="amount:5; speed:2200">
+        <a-cylinder
+          position="0 1.2 0"
+          radius="0.15"
+          height="2.4"
+          color="#3b2510"
+        ></a-cylinder>
+        <a-sphere
+          position="0 3 0"
+          radius="1.1"
+          color="#1a4a1a"
+          animation="property:scale; from:1 1 1; to:0.85 1.1 0.85; dur:1800; dir:alternate; loop:true; easing:easeInOutSine"
+        ></a-sphere>
+        <a-sphere
+          position="-0.5 2.6 0.3"
+          radius="0.7"
+          color="#1e5a1e"
+          animation="property:scale; from:1 1 1; to:0.9 1.05 0.9; dur:2100; dir:alternate; loop:true; easing:easeInOutSine"
+        ></a-sphere>
+        <a-sphere
+          position="0.4 2.8 -0.2"
+          radius="0.6"
+          color="#164516"
+          animation="property:scale; from:1 1 1; to:0.88 1.08 0.88; dur:1900; dir:alternate; loop:true; easing:easeInOutSine"
+        ></a-sphere>
+      </a-entity>
+
+      <!-- Tree 2 (right) -->
+      <a-entity position="5.5 0 -15" tree-sway="amount:6; speed:2500">
+        <a-cylinder
+          position="0 1.5 0"
+          radius="0.18"
+          height="3"
+          color="#3b2510"
+        ></a-cylinder>
+        <a-sphere
+          position="0 3.5 0"
+          radius="1.3"
+          color="#1e4a1a"
+          animation="property:scale; from:1 1 1; to:0.82 1.12 0.82; dur:2000; dir:alternate; loop:true; easing:easeInOutSine"
+        ></a-sphere>
+        <a-sphere
+          position="0.6 3 0.4"
+          radius="0.8"
+          color="#225522"
+          animation="property:scale; from:1 1 1; to:0.87 1.07 0.87; dur:2300; dir:alternate; loop:true; easing:easeInOutSine"
+        ></a-sphere>
+      </a-entity>
+
+      <!-- Tree 3 (far left) -->
+      <a-entity position="-8 0 -16" tree-sway="amount:4; speed:2800">
+        <a-cylinder
+          position="0 1 0"
+          radius="0.12"
+          height="2"
+          color="#2e1a0a"
+        ></a-cylinder>
+        <a-sphere
+          position="0 2.5 0"
+          radius="0.9"
+          color="#254a25"
+          animation="property:scale; from:1 1 1; to:0.9 1.08 0.9; dur:2400; dir:alternate; loop:true; easing:easeInOutSine"
+        ></a-sphere>
+      </a-entity>
+
+      <!-- Tree 4 (center-right, closer) -->
+      <a-entity position="2 0 -12.5" tree-sway="amount:7; speed:1900">
+        <a-cylinder
+          position="0 1.8 0"
+          radius="0.2"
+          height="3.6"
+          color="#3b2510"
+        ></a-cylinder>
+        <a-sphere
+          position="0 4.2 0"
+          radius="1.5"
+          color="#1a3a14"
+          animation="property:scale; from:1 1 1; to:0.8 1.15 0.8; dur:1700; dir:alternate; loop:true; easing:easeInOutSine"
+        ></a-sphere>
+        <a-sphere
+          position="-0.8 3.5 0.5"
+          radius="0.9"
+          color="#1e4e1a"
+          animation="property:scale; from:1 1 1; to:0.85 1.1 0.85; dur:2000; dir:alternate; loop:true; easing:easeInOutSine"
+        ></a-sphere>
+        <a-sphere
+          position="0.7 3.8 -0.3"
+          radius="0.75"
+          color="#163a16"
+          animation="property:scale; from:1 1 1; to:0.88 1.06 0.88; dur:2200; dir:alternate; loop:true; easing:easeInOutSine"
+        ></a-sphere>
+      </a-entity>
+
+      <!-- Tree 5 (far right) -->
+      <a-entity position="8 0 -17" tree-sway="amount:5; speed:2600">
+        <a-cylinder
+          position="0 1.3 0"
+          radius="0.14"
+          height="2.6"
+          color="#2e1a0a"
+        ></a-cylinder>
+        <a-sphere
+          position="0 3.1 0"
+          radius="1"
+          color="#1f4f1f"
+          animation="property:scale; from:1 1 1; to:0.86 1.09 0.86; dur:2500; dir:alternate; loop:true; easing:easeInOutSine"
+        ></a-sphere>
+      </a-entity>
+
+      <!-- Tree 6 (far center) -->
+      <a-entity position="-1 0 -18" tree-sway="amount:4; speed:3000">
+        <a-cylinder
+          position="0 2 0"
+          radius="0.22"
+          height="4"
+          color="#3b2510"
+        ></a-cylinder>
+        <a-sphere
+          position="0 4.6 0"
+          radius="1.6"
+          color="#163916"
+          animation="property:scale; from:1 1 1; to:0.83 1.12 0.83; dur:2800; dir:alternate; loop:true; easing:easeInOutSine"
+        ></a-sphere>
+        <a-sphere
+          position="0.9 4 0.5"
+          radius="1"
+          color="#1a4a1a"
+          animation="property:scale; from:1 1 1; to:0.87 1.08 0.87; dur:2400; dir:alternate; loop:true; easing:easeInOutSine"
+        ></a-sphere>
+      </a-entity>
+
+      <!-- Distant faint moon behind clouds -->
+      <a-sphere
+        position="6 7.5 -21"
+        radius="0.8"
+        color="#d4d8e8"
+        material="emissive:#b8bcd0; emissiveIntensity:0.4; opacity:0.35; transparent:true"
+      ></a-sphere>
+      <!-- Moon glow -->
+      <a-entity
+        position="6 7.5 -21"
+        light="type:point; color:#8090b0; intensity:0.3; distance:12; decay:2"
+      ></a-entity>
 
       <!-- Fireplace with animated flame core -->
       <a-box
