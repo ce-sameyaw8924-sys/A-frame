@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>A-Frame - Grand Dining Room</title>
+    <title>A-Frame - Dining Room</title>
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
     <style>
       :root {
@@ -61,16 +61,511 @@
         font-size: clamp(12px, 1.8vw, 14px);
         line-height: 1.45;
       }
+
+      .a-enter-vr {
+        display: none !important;
+      }
+
+      #controls-panel {
+        position: fixed;
+        bottom: 12px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 10;
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+      #controls-panel button {
+        padding: 8px 14px;
+        font-size: 13px;
+        border: 1px solid rgba(201, 164, 84, 0.6);
+        border-radius: 8px;
+        background: rgba(40, 20, 14, 0.85);
+        color: #ffde94;
+        cursor: pointer;
+        font-family: inherit;
+        backdrop-filter: blur(4px);
+        transition: background 0.2s;
+      }
+      #controls-panel button:hover {
+        background: rgba(90, 31, 36, 0.9);
+      }
+
+      #status-bar {
+        position: fixed;
+        bottom: 60px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 10;
+        color: #ffde94;
+        font-size: 14px;
+        font-family: inherit;
+        text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
+        pointer-events: none;
+      }
+      #interact-hint {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, 24px);
+        z-index: 10;
+        color: #ffde94;
+        font-size: 13px;
+        font-family: inherit;
+        text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
+        pointer-events: none;
+      }
+      #crosshair {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        width: 12px;
+        height: 12px;
+        margin: -6px 0 0 -6px;
+        border: 2px solid rgba(255, 222, 148, 0.6);
+        border-radius: 50%;
+        z-index: 10;
+        pointer-events: none;
+      }
+      #photo-flash {
+        position: fixed;
+        inset: 0;
+        background: white;
+        z-index: 100;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.15s;
+      }
+      .tp-marker {
+        cursor: pointer;
+      }
     </style>
+
+    <script>
+      /* ========== A-Frame Custom Components ========== */
+
+      /* Boundary check — keeps player inside room */
+      AFRAME.registerComponent("boundary-check", {
+        tick: function () {
+          var p = this.el.object3D.position;
+          p.x = Math.max(-8.2, Math.min(8.2, p.x));
+          p.z = Math.max(-9.2, Math.min(3.5, p.z));
+        },
+      });
+
+      /* Hover glow — emissive highlight on mouse enter */
+      AFRAME.registerComponent("hover-glow", {
+        init: function () {
+          var el = this.el;
+          var hint = document.getElementById("interact-hint");
+          el.addEventListener("mouseenter", function () {
+            el.setAttribute("material", "emissive", "#554422");
+            el.setAttribute("material", "emissiveIntensity", 0.35);
+            if (hint) hint.textContent = "\u{1F5B1} Click to interact";
+          });
+          el.addEventListener("mouseleave", function () {
+            el.setAttribute("material", "emissive", "#000");
+            el.setAttribute("material", "emissiveIntensity", 0);
+            if (hint) hint.textContent = "";
+          });
+        },
+      });
+
+      /* Grabbable — click to lift item, click again to place back */
+      AFRAME.registerComponent("grabbable", {
+        schema: { liftHeight: { type: "number", default: 0.3 } },
+        init: function () {
+          this.held = false;
+          this.origY = null;
+          var self = this;
+          this.el.addEventListener("click", function () {
+            var pos = self.el.getAttribute("position");
+            if (!self.held) {
+              self.origY = pos.y;
+              self.el.setAttribute("animation__grab", {
+                property: "position",
+                to: pos.x + " " + (pos.y + self.data.liftHeight) + " " + pos.z,
+                dur: 300,
+                easing: "easeOutQuad",
+              });
+              self.el.setAttribute("animation__spin", {
+                property: "rotation",
+                to: "0 360 0",
+                dur: 1500,
+                loop: true,
+                easing: "linear",
+              });
+              self.held = true;
+              updateStatus("Picked up " + (self.el.id || "item") + "!");
+              playClickSound();
+            } else {
+              self.el.setAttribute("animation__grab", {
+                property: "position",
+                to: pos.x + " " + self.origY + " " + pos.z,
+                dur: 300,
+                easing: "easeInQuad",
+              });
+              self.el.removeAttribute("animation__spin");
+              self.el.setAttribute("rotation", "0 0 0");
+              self.held = false;
+              updateStatus("Placed " + (self.el.id || "item") + " back down.");
+              playClickSound();
+            }
+          });
+        },
+      });
+
+      /* Teleport point — click to move rig */
+      AFRAME.registerComponent("teleport-point", {
+        schema: {
+          targetX: { type: "number", default: 0 },
+          targetZ: { type: "number", default: 0 },
+        },
+        init: function () {
+          var data = this.data;
+          this.el.addEventListener("click", function () {
+            var rig = document.getElementById("rig");
+            rig.setAttribute("position", data.targetX + " 0 " + data.targetZ);
+            updateStatus("\u26A1 Teleported!");
+            playWhoosh();
+          });
+          this.el.addEventListener("mouseenter", function () {
+            var h = document.getElementById("interact-hint");
+            if (h) h.textContent = "\u26A1 Click to teleport";
+          });
+          this.el.addEventListener("mouseleave", function () {
+            var h = document.getElementById("interact-hint");
+            if (h) h.textContent = "";
+          });
+        },
+      });
+
+      /* Steam particles — spawns tiny rising, fading spheres */
+      AFRAME.registerComponent("steam-effect", {
+        init: function () {
+          this.particles = [];
+          this.timer = 0;
+        },
+        tick: function (t, dt) {
+          this.timer += dt;
+          if (this.timer > 350) {
+            this.timer = 0;
+            this.spawn();
+          }
+          var self = this;
+          this.particles = this.particles.filter(function (p) {
+            p.age += dt;
+            if (p.age > 2200) {
+              p.el.parentNode.removeChild(p.el);
+              return false;
+            }
+            var prog = p.age / 2200;
+            p.el.object3D.position.y += 0.0012;
+            p.el.setAttribute("material", "opacity", 0.28 * (1 - prog));
+            return true;
+          });
+        },
+        spawn: function () {
+          var s = document.createElement("a-sphere");
+          var xo = (Math.random() - 0.5) * 0.04;
+          var zo = (Math.random() - 0.5) * 0.04;
+          s.setAttribute("position", xo + " 0 " + zo);
+          s.setAttribute("radius", "0.012");
+          s.setAttribute("color", "#ffffff");
+          s.setAttribute("material", "opacity: 0.28; transparent: true");
+          this.el.appendChild(s);
+          this.particles.push({ el: s, age: 0 });
+        },
+      });
+
+      /* Easter egg — click crystal 5 times for a surprise */
+      AFRAME.registerComponent("easter-egg", {
+        init: function () {
+          this.clicks = 0;
+          var self = this;
+          this.el.addEventListener("click", function () {
+            self.clicks++;
+            if (self.clicks >= 5) {
+              self.activate();
+              self.clicks = 0;
+            }
+          });
+        },
+        activate: function () {
+          updateStatus("\u{1F389} Easter Egg! You found the secret!");
+          var sky = document.querySelector("a-sky");
+          var cols = [
+            "#ff0000",
+            "#ff8800",
+            "#ffff00",
+            "#00ff00",
+            "#0088ff",
+            "#8800ff",
+          ];
+          var orig = sky.getAttribute("color");
+          var i = 0;
+          var iv = setInterval(function () {
+            sky.setAttribute("color", cols[i % cols.length]);
+            i++;
+            if (i > 18) {
+              clearInterval(iv);
+              sky.setAttribute("color", orig);
+            }
+          }, 140);
+          playEasterEgg();
+        },
+      });
+
+      /* ========== Audio System (Web Audio API — no external files) ========== */
+      var audioCtx;
+      function getAudioCtx() {
+        if (!audioCtx)
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        return audioCtx;
+      }
+
+      function playClickSound() {
+        try {
+          var c = getAudioCtx(),
+            o = c.createOscillator(),
+            g = c.createGain();
+          o.connect(g);
+          g.connect(c.destination);
+          o.frequency.setValueAtTime(800, c.currentTime);
+          o.frequency.exponentialRampToValueAtTime(400, c.currentTime + 0.1);
+          g.gain.setValueAtTime(0.15, c.currentTime);
+          g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.15);
+          o.start(c.currentTime);
+          o.stop(c.currentTime + 0.15);
+        } catch (e) {}
+      }
+
+      function playWhoosh() {
+        try {
+          var c = getAudioCtx(),
+            len = c.sampleRate * 0.3;
+          var buf = c.createBuffer(1, len, c.sampleRate),
+            d = buf.getChannelData(0);
+          for (var i = 0; i < len; i++)
+            d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+          var src = c.createBufferSource();
+          src.buffer = buf;
+          var g = c.createGain();
+          g.gain.setValueAtTime(0.18, c.currentTime);
+          g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.3);
+          var f = c.createBiquadFilter();
+          f.type = "bandpass";
+          f.frequency.setValueAtTime(1000, c.currentTime);
+          f.frequency.exponentialRampToValueAtTime(200, c.currentTime + 0.3);
+          src.connect(f);
+          f.connect(g);
+          g.connect(c.destination);
+          src.start();
+        } catch (e) {}
+      }
+
+      function playEasterEgg() {
+        try {
+          var c = getAudioCtx(),
+            notes = [523, 659, 784, 1047, 784, 659, 523];
+          notes.forEach(function (freq, i) {
+            var o = c.createOscillator(),
+              g = c.createGain();
+            o.connect(g);
+            g.connect(c.destination);
+            o.frequency.value = freq;
+            o.type = "triangle";
+            g.gain.setValueAtTime(0.12, c.currentTime + i * 0.12);
+            g.gain.exponentialRampToValueAtTime(
+              0.001,
+              c.currentTime + i * 0.12 + 0.11,
+            );
+            o.start(c.currentTime + i * 0.12);
+            o.stop(c.currentTime + i * 0.12 + 0.12);
+          });
+        } catch (e) {}
+      }
+
+      function playFootstep() {
+        try {
+          var c = getAudioCtx(),
+            o = c.createOscillator(),
+            g = c.createGain();
+          o.connect(g);
+          g.connect(c.destination);
+          o.frequency.value = 80 + Math.random() * 40;
+          o.type = "sine";
+          g.gain.setValueAtTime(0.06, c.currentTime);
+          g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.08);
+          o.start(c.currentTime);
+          o.stop(c.currentTime + 0.08);
+        } catch (e) {}
+      }
+
+      /* Ambient room drone — started on first user gesture */
+      var ambienceStarted = false;
+      function startAmbience() {
+        if (ambienceStarted) return;
+        ambienceStarted = true;
+        try {
+          var c = getAudioCtx();
+          var o = c.createOscillator();
+          o.type = "sine";
+          o.frequency.value = 60;
+          var g = c.createGain();
+          g.gain.value = 0.018;
+          o.connect(g);
+          g.connect(c.destination);
+          o.start();
+          var len = c.sampleRate * 2,
+            buf = c.createBuffer(1, len, c.sampleRate);
+          var d = buf.getChannelData(0);
+          for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+          var n = c.createBufferSource();
+          n.buffer = buf;
+          n.loop = true;
+          var ng = c.createGain();
+          ng.gain.value = 0.006;
+          var lp = c.createBiquadFilter();
+          lp.type = "lowpass";
+          lp.frequency.value = 180;
+          n.connect(lp);
+          lp.connect(ng);
+          ng.connect(c.destination);
+          n.start();
+        } catch (e) {}
+      }
+      document.addEventListener("click", startAmbience, { once: true });
+      document.addEventListener("keydown", startAmbience, { once: true });
+
+      /* ========== Status / Day-Night / Photo / Reset ========== */
+      function updateStatus(msg) {
+        var el = document.getElementById("status-text");
+        if (!el) return;
+        el.textContent = msg;
+        clearTimeout(el._t);
+        el._t = setTimeout(function () {
+          el.textContent = "";
+        }, 3500);
+      }
+
+      var isDayMode = false;
+      function toggleDayNight() {
+        isDayMode = !isDayMode;
+        var sky = document.querySelector("a-sky");
+        var scene = document.querySelector("a-scene");
+        var btn = document.getElementById("day-night-btn");
+        if (isDayMode) {
+          sky.setAttribute("color", "#87ceeb");
+          scene.setAttribute(
+            "fog",
+            "type: exponential; color: #c8dff0; density: 0.006",
+          );
+          if (btn) btn.textContent = "\u{1F319} Night";
+        } else {
+          sky.setAttribute("color", "#170f0c");
+          scene.setAttribute(
+            "fog",
+            "type: exponential; color: #1d1410; density: 0.022",
+          );
+          if (btn) btn.textContent = "\u2600\uFE0F Day";
+        }
+        playClickSound();
+      }
+
+      function resetScene() {
+        document.getElementById("rig").setAttribute("position", "0 0 2");
+        updateStatus("Scene reset!");
+        playClickSound();
+      }
+
+      var photoMode = false;
+      function togglePhotoMode() {
+        photoMode = !photoMode;
+        var hud = document.getElementById("hud");
+        var cp = document.getElementById("controls-panel");
+        var ch = document.getElementById("crosshair");
+        var flash = document.getElementById("photo-flash");
+        if (photoMode) {
+          if (hud) hud.style.display = "none";
+          if (cp) cp.style.display = "none";
+          if (ch) ch.style.display = "none";
+          if (flash) {
+            flash.style.opacity = "1";
+            setTimeout(function () {
+              flash.style.opacity = "0";
+            }, 200);
+          }
+          updateStatus("\u{1F4F8} Photo Mode — press P to exit");
+        } else {
+          if (hud) hud.style.display = "block";
+          if (cp) cp.style.display = "flex";
+          if (ch) ch.style.display = "block";
+        }
+      }
+
+      /* Keyboard shortcuts */
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "p" || e.key === "P") togglePhotoMode();
+        if (e.key === "n" || e.key === "N") toggleDayNight();
+        if (
+          (e.key === "r" || e.key === "R") &&
+          document.activeElement.tagName !== "INPUT"
+        )
+          resetScene();
+      });
+
+      /* Footstep tracking */
+      var lastRigPos = { x: 0, z: 0 };
+      setInterval(function () {
+        var rig = document.getElementById("rig");
+        if (!rig) return;
+        var pos = rig.getAttribute("position");
+        if (!pos) return;
+        var dx = pos.x - lastRigPos.x,
+          dz = pos.z - lastRigPos.z;
+        if (Math.sqrt(dx * dx + dz * dz) > 0.08) playFootstep();
+        lastRigPos.x = pos.x;
+        lastRigPos.z = pos.z;
+      }, 350);
+
+      /* Auto-apply hover-glow and grabbable on scene load */
+      document.addEventListener("DOMContentLoaded", function () {
+        var scene = document.querySelector("a-scene");
+        scene.addEventListener("loaded", function () {
+          document.querySelectorAll(".interactable").forEach(function (el) {
+            el.setAttribute("hover-glow", "");
+          });
+          var milo = document.getElementById("milo");
+          var milk = document.getElementById("milk");
+          if (milo) milo.setAttribute("grabbable", "");
+          if (milk) milk.setAttribute("grabbable", "");
+        });
+      });
+    </script>
   </head>
   <body>
     <div id="hud">
       <h1>Grand Dining Room</h1>
       <p>
-        Move with WASD or arrow keys. Look around with mouse or touch drag. Your
-        dining set remains fully interactive and model-free. Tonight: signature
-        gala atmosphere.
+        <b>WASD / Arrows:</b> Move &nbsp; <b>Mouse:</b> Look<br />
+        <b>Click:</b> Interact &nbsp; <b>N:</b> Day/Night &nbsp; <b>P:</b> Photo
+        Mode &nbsp; <b>R:</b> Reset<br />
+        Click tins to grab. Click crystal 5&times; for a surprise!
       </p>
+    </div>
+    <div id="crosshair"></div>
+    <div id="interact-hint"></div>
+    <div id="status-bar"><span id="status-text"></span></div>
+    <div id="photo-flash"></div>
+    <div id="controls-panel">
+      <button id="day-night-btn" onclick="toggleDayNight()">
+        &#9728;&#65039; Day
+      </button>
+      <button onclick="togglePhotoMode()">&#128248; Photo</button>
+      <button onclick="resetScene()">&#8634; Reset</button>
     </div>
 
     <a-scene
@@ -78,8 +573,13 @@
       shadow="type: pcfsoft"
       fog="type: exponential; color: #1d1410; density: 0.022"
     >
-      <!-- Player rig: movement and look-controls preserved -->
-      <a-entity id="rig" position="0 0 2" wasd-controls="acceleration: 42">
+      <!-- Player rig: movement + collision boundaries -->
+      <a-entity
+        id="rig"
+        position="0 0 2"
+        wasd-controls="acceleration: 42"
+        boundary-check
+      >
         <a-entity
           id="camera"
           camera="fov: 72"
@@ -619,12 +1119,14 @@
         color="#d8c7ad"
       ></a-box>
 
-      <!-- Floating crystal centerpiece above the table -->
+      <!-- Floating crystal centerpiece above the table (Easter Egg!) -->
       <a-entity
         position="0 1.35 -4"
         animation="property: rotation; to: 0 360 0; loop: true; dur: 12000; easing: linear"
       >
         <a-octahedron
+          class="interactable"
+          easter-egg
           radius="0.12"
           color="#7cc9ff"
           material="metalness: 0.35; roughness: 0.12; emissive: #2c6ca0; emissiveIntensity: 0.18"
@@ -871,60 +1373,205 @@
       <!-- ===== Additional tabletop items ===== -->
 
       <!-- Glass water jug with handle silhouette -->
-      <a-cylinder position="-0.75 0.91 -3.62" radius="0.09" height="0.2" color="#c5e8f7" material="opacity: 0.55; transparent: true" shadow="cast: true"></a-cylinder>
-      <a-cylinder position="-0.75 1.02 -3.62" radius="0.1" height="0.02" color="#a0d4ea" material="opacity: 0.6; transparent: true"></a-cylinder>
+      <a-cylinder
+        position="-0.75 0.91 -3.62"
+        radius="0.09"
+        height="0.2"
+        color="#c5e8f7"
+        material="opacity: 0.55; transparent: true"
+        shadow="cast: true"
+      ></a-cylinder>
+      <a-cylinder
+        position="-0.75 1.02 -3.62"
+        radius="0.1"
+        height="0.02"
+        color="#a0d4ea"
+        material="opacity: 0.6; transparent: true"
+      ></a-cylinder>
       <!-- Water inside -->
-      <a-cylinder position="-0.75 0.89 -3.62" radius="0.075" height="0.13" color="#7fbbdd" material="opacity: 0.4; transparent: true"></a-cylinder>
+      <a-cylinder
+        position="-0.75 0.89 -3.62"
+        radius="0.075"
+        height="0.13"
+        color="#7fbbdd"
+        material="opacity: 0.4; transparent: true"
+      ></a-cylinder>
 
       <!-- Honey / jam jar -->
-      <a-cylinder position="0.6 0.89 -4.35" radius="0.065" height="0.16" color="#e8a832" shadow="cast: true"></a-cylinder>
-      <a-cylinder position="0.6 0.975 -4.35" radius="0.07" height="0.02" color="#d4a032"></a-cylinder>
+      <a-cylinder
+        position="0.6 0.89 -4.35"
+        radius="0.065"
+        height="0.16"
+        color="#e8a832"
+        shadow="cast: true"
+      ></a-cylinder>
+      <a-cylinder
+        position="0.6 0.975 -4.35"
+        radius="0.07"
+        height="0.02"
+        color="#d4a032"
+      ></a-cylinder>
       <a-entity position="0.6 1.02 -4.35">
         <a-text value="Jam" align="center" color="#5a2d0c" width="0.5"></a-text>
       </a-entity>
 
       <!-- Sugar bowl -->
-      <a-cylinder position="-0.62 0.87 -4.38" radius="0.08" height="0.1" color="#f5f0e6" shadow="cast: true"></a-cylinder>
-      <a-sphere position="-0.62 0.93 -4.38" radius="0.08" color="#f5f0e6" theta-length="90"></a-sphere>
+      <a-cylinder
+        position="-0.62 0.87 -4.38"
+        radius="0.08"
+        height="0.1"
+        color="#f5f0e6"
+        shadow="cast: true"
+      ></a-cylinder>
+      <a-sphere
+        position="-0.62 0.93 -4.38"
+        radius="0.08"
+        color="#f5f0e6"
+        theta-length="90"
+      ></a-sphere>
       <a-entity position="-0.62 0.97 -4.38">
-        <a-text value="Sugar" align="center" color="#8c7a5c" width="0.45"></a-text>
+        <a-text
+          value="Sugar"
+          align="center"
+          color="#8c7a5c"
+          width="0.45"
+        ></a-text>
       </a-entity>
 
       <!-- Two extra drinking cups (for the MiLo & Milk) near each chair -->
       <a-entity position="-0.9 0 -4">
         <!-- Left cup with saucer -->
-        <a-cylinder position="0 0.84 0" radius="0.11" height="0.015" color="#f5f0e6" shadow="cast: true"></a-cylinder>
-        <a-cylinder position="0 0.87 0" radius="0.055" height="0.1" color="#f8f4ec" shadow="cast: true"></a-cylinder>
+        <a-cylinder
+          position="0 0.84 0"
+          radius="0.11"
+          height="0.015"
+          color="#f5f0e6"
+          shadow="cast: true"
+        ></a-cylinder>
+        <a-cylinder
+          position="0 0.87 0"
+          radius="0.055"
+          height="0.1"
+          color="#f8f4ec"
+          shadow="cast: true"
+        ></a-cylinder>
         <!-- Dark liquid inside -->
-        <a-cylinder position="0 0.91 0" radius="0.045" height="0.02" color="#3e2009"></a-cylinder>
+        <a-cylinder
+          position="0 0.91 0"
+          radius="0.045"
+          height="0.02"
+          color="#3e2009"
+        ></a-cylinder>
       </a-entity>
       <a-entity position="0.9 0 -4">
         <!-- Right cup with saucer -->
-        <a-cylinder position="0 0.84 0" radius="0.11" height="0.015" color="#f5f0e6" shadow="cast: true"></a-cylinder>
-        <a-cylinder position="0 0.87 0" radius="0.055" height="0.1" color="#f8f4ec" shadow="cast: true"></a-cylinder>
+        <a-cylinder
+          position="0 0.84 0"
+          radius="0.11"
+          height="0.015"
+          color="#f5f0e6"
+          shadow="cast: true"
+        ></a-cylinder>
+        <a-cylinder
+          position="0 0.87 0"
+          radius="0.055"
+          height="0.1"
+          color="#f8f4ec"
+          shadow="cast: true"
+        ></a-cylinder>
         <!-- Light liquid inside -->
-        <a-cylinder position="0 0.91 0" radius="0.045" height="0.02" color="#f0e0c8"></a-cylinder>
+        <a-cylinder
+          position="0 0.91 0"
+          radius="0.045"
+          height="0.02"
+          color="#f0e0c8"
+        ></a-cylinder>
       </a-entity>
 
       <!-- Bread basket -->
-      <a-cylinder position="0 0.85 -4.42" radius="0.16" height="0.07" color="#b8863a" shadow="cast: true"></a-cylinder>
-      <a-sphere position="-0.04 0.91 -4.42" radius="0.06" color="#d4a860"></a-sphere>
-      <a-sphere position="0.06 0.91 -4.38" radius="0.055" color="#cfa050"></a-sphere>
-      <a-sphere position="0.01 0.91 -4.47" radius="0.058" color="#c89a48"></a-sphere>
+      <a-cylinder
+        position="0 0.85 -4.42"
+        radius="0.16"
+        height="0.07"
+        color="#b8863a"
+        shadow="cast: true"
+      ></a-cylinder>
+      <a-sphere
+        position="-0.04 0.91 -4.42"
+        radius="0.06"
+        color="#d4a860"
+      ></a-sphere>
+      <a-sphere
+        position="0.06 0.91 -4.38"
+        radius="0.055"
+        color="#cfa050"
+      ></a-sphere>
+      <a-sphere
+        position="0.01 0.91 -4.47"
+        radius="0.058"
+        color="#c89a48"
+      ></a-sphere>
 
       <!-- Napkin holder -->
-      <a-box position="0.42 0.86 -3.5" width="0.14" depth="0.06" height="0.13" color="#d4c3a8" shadow="cast: true"></a-box>
-      <a-box position="0.42 0.86 -3.5" width="0.12" depth="0.01" height="0.11" color="#f5f0e6"></a-box>
+      <a-box
+        position="0.42 0.86 -3.5"
+        width="0.14"
+        depth="0.06"
+        height="0.13"
+        color="#d4c3a8"
+        shadow="cast: true"
+      ></a-box>
+      <a-box
+        position="0.42 0.86 -3.5"
+        width="0.12"
+        depth="0.01"
+        height="0.11"
+        color="#f5f0e6"
+      ></a-box>
 
       <!-- Two small spoons beside cups -->
-      <a-cylinder position="-0.98 0.845 -3.88" radius="0.008" height="0.14" color="#c0c0c0" rotation="0 0 90" shadow="cast: true"></a-cylinder>
-      <a-cylinder position="0.98 0.845 -3.88" radius="0.008" height="0.14" color="#c0c0c0" rotation="0 0 90" shadow="cast: true"></a-cylinder>
+      <a-cylinder
+        position="-0.98 0.845 -3.88"
+        radius="0.008"
+        height="0.14"
+        color="#c0c0c0"
+        rotation="0 0 90"
+        shadow="cast: true"
+      ></a-cylinder>
+      <a-cylinder
+        position="0.98 0.845 -3.88"
+        radius="0.008"
+        height="0.14"
+        color="#c0c0c0"
+        rotation="0 0 90"
+        shadow="cast: true"
+      ></a-cylinder>
 
       <!-- Salt & pepper shakers -->
-      <a-cylinder position="-0.15 0.87 -3.52" radius="0.03" height="0.1" color="#f5f5f5" shadow="cast: true"></a-cylinder>
-      <a-sphere position="-0.15 0.925 -3.52" radius="0.032" color="#e0e0e0"></a-sphere>
-      <a-cylinder position="0.15 0.87 -3.52" radius="0.03" height="0.1" color="#2a2a2a" shadow="cast: true"></a-cylinder>
-      <a-sphere position="0.15 0.925 -3.52" radius="0.032" color="#1a1a1a"></a-sphere>
+      <a-cylinder
+        position="-0.15 0.87 -3.52"
+        radius="0.03"
+        height="0.1"
+        color="#f5f5f5"
+        shadow="cast: true"
+      ></a-cylinder>
+      <a-sphere
+        position="-0.15 0.925 -3.52"
+        radius="0.032"
+        color="#e0e0e0"
+      ></a-sphere>
+      <a-cylinder
+        position="0.15 0.87 -3.52"
+        radius="0.03"
+        height="0.1"
+        color="#2a2a2a"
+        shadow="cast: true"
+      ></a-cylinder>
+      <a-sphere
+        position="0.15 0.925 -3.52"
+        radius="0.032"
+        color="#1a1a1a"
+      ></a-sphere>
 
       <!-- Console cabinet and wall art for upscale atmosphere -->
       <a-box
@@ -979,6 +1626,67 @@
           animation="property: rotation; to: -360 -360 0; dur: 9000; loop: true; easing: linear"
         ></a-octahedron>
       </a-entity>
+
+      <!-- ===== Steam rising from cups ===== -->
+      <a-entity position="-0.9 0.96 -4" steam-effect></a-entity>
+      <a-entity position="0.9 0.96 -4" steam-effect></a-entity>
+
+      <!-- ===== Teleport markers on the floor ===== -->
+      <a-ring
+        class="interactable tp-marker"
+        teleport-point="targetX:0; targetZ:1.5"
+        position="0 0.03 1.5"
+        rotation="-90 0 0"
+        radius-inner="0.18"
+        radius-outer="0.28"
+        color="#ffde94"
+        material="opacity:0.5; transparent:true"
+        animation="property: material.opacity; from:0.3; to:0.7; dir:alternate; loop:true; dur:1200"
+      ></a-ring>
+      <a-ring
+        class="interactable tp-marker"
+        teleport-point="targetX:0; targetZ:-2.5"
+        position="0 0.03 -2.5"
+        rotation="-90 0 0"
+        radius-inner="0.18"
+        radius-outer="0.28"
+        color="#ffde94"
+        material="opacity:0.5; transparent:true"
+        animation="property: material.opacity; from:0.3; to:0.7; dir:alternate; loop:true; dur:1200"
+      ></a-ring>
+      <a-ring
+        class="interactable tp-marker"
+        teleport-point="targetX:-6.5; targetZ:-4"
+        position="-6.5 0.03 -4"
+        rotation="-90 0 0"
+        radius-inner="0.18"
+        radius-outer="0.28"
+        color="#ffcc77"
+        material="opacity:0.5; transparent:true"
+        animation="property: material.opacity; from:0.3; to:0.7; dir:alternate; loop:true; dur:1200"
+      ></a-ring>
+      <a-ring
+        class="interactable tp-marker"
+        teleport-point="targetX:6.5; targetZ:-4"
+        position="6.5 0.03 -4"
+        rotation="-90 0 0"
+        radius-inner="0.18"
+        radius-outer="0.28"
+        color="#aadcff"
+        material="opacity:0.5; transparent:true"
+        animation="property: material.opacity; from:0.3; to:0.7; dir:alternate; loop:true; dur:1200"
+      ></a-ring>
+      <a-ring
+        class="interactable tp-marker"
+        teleport-point="targetX:0; targetZ:-8"
+        position="0 0.03 -8"
+        rotation="-90 0 0"
+        radius-inner="0.18"
+        radius-outer="0.28"
+        color="#ff9a32"
+        material="opacity:0.5; transparent:true"
+        animation="property: material.opacity; from:0.3; to:0.7; dir:alternate; loop:true; dur:1200"
+      ></a-ring>
     </a-scene>
   </body>
 </html>
