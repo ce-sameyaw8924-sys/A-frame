@@ -7,11 +7,11 @@
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
     <style>
       :root {
-        --ink: #2b1d16;
-        --ivory: #f4ecde;
-        --gold: #c9a454;
-        --burgundy: #5a1f24;
-        --oak: #5d3a25;
+        --ink: #0a0a14;
+        --ivory: #f0f4f8;
+        --accent: #3b82f6;
+        --navy: #1e3a5f;
+        --dark: #1a1a2a;
       }
 
       html,
@@ -23,10 +23,9 @@
         font-family: "Georgia", "Times New Roman", serif;
         background: radial-gradient(
           circle at 20% 10%,
-          #fff3db 0%,
-          #e5cda2 26%,
-          #7a5538 72%,
-          #2f1c13 100%
+          #1a2a4a 0%,
+          #0f1a2f 40%,
+          #070b14 100%
         );
       }
 
@@ -39,13 +38,13 @@
         color: var(--ivory);
         background: linear-gradient(
           135deg,
-          rgb(40 20 14 / 85%),
-          rgb(86 29 35 / 82%)
+          rgb(10 10 20 / 88%),
+          rgb(30 58 95 / 85%)
         );
-        border: 1px solid rgb(201 164 84 / 70%);
+        border: 1px solid rgb(59 130 246 / 60%);
         border-radius: 14px;
         padding: 12px 14px;
-        box-shadow: 0 10px 30px rgb(0 0 0 / 35%);
+        box-shadow: 0 10px 30px rgb(0 0 0 / 45%);
         backdrop-filter: blur(4px);
       }
 
@@ -53,7 +52,7 @@
         margin: 0 0 6px;
         font-size: clamp(15px, 2.2vw, 20px);
         letter-spacing: 0.06em;
-        color: #ffde94;
+        color: #93c5fd;
       }
 
       #hud p {
@@ -80,17 +79,17 @@
       #controls-panel button {
         padding: 8px 14px;
         font-size: 13px;
-        border: 1px solid rgba(201, 164, 84, 0.6);
+        border: 1px solid rgba(59, 130, 246, 0.6);
         border-radius: 8px;
-        background: rgba(40, 20, 14, 0.85);
-        color: #ffde94;
+        background: rgba(10, 10, 20, 0.88);
+        color: #93c5fd;
         cursor: pointer;
         font-family: inherit;
         backdrop-filter: blur(4px);
         transition: background 0.2s;
       }
       #controls-panel button:hover {
-        background: rgba(90, 31, 36, 0.9);
+        background: rgba(30, 58, 95, 0.9);
       }
 
       #status-bar {
@@ -99,7 +98,7 @@
         left: 50%;
         transform: translateX(-50%);
         z-index: 10;
-        color: #ffde94;
+        color: #93c5fd;
         font-size: 14px;
         font-family: inherit;
         text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
@@ -111,7 +110,7 @@
         left: 50%;
         transform: translate(-50%, 24px);
         z-index: 10;
-        color: #ffde94;
+        color: #93c5fd;
         font-size: 13px;
         font-family: inherit;
         text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
@@ -124,7 +123,7 @@
         width: 12px;
         height: 12px;
         margin: -6px 0 0 -6px;
-        border: 2px solid rgba(255, 222, 148, 0.6);
+        border: 2px solid rgba(59, 130, 246, 0.6);
         border-radius: 50%;
         z-index: 10;
         pointer-events: none;
@@ -146,12 +145,106 @@
     <script>
       /* ========== A-Frame Custom Components ========== */
 
+      /* Window toggle — click glass to swing open / closed */
+      AFRAME.registerComponent("window-toggle", {
+        schema: { side: { type: "string", default: "left" } },
+        init: function () {
+          this.open = false;
+          var self = this;
+          var dir = this.data.side === "left" ? 1 : -1;
+          this.el.addEventListener("click", function () {
+            self.open = !self.open;
+            if (self.open) {
+              self.el.setAttribute("animation__win", {
+                property: "rotation",
+                to: "0 " + 75 * dir + " 0",
+                dur: 600,
+                easing: "easeOutQuad",
+              });
+              updateStatus("\u{1FA9F} Window opened — feel the storm!");
+            } else {
+              self.el.setAttribute("animation__win", {
+                property: "rotation",
+                to: "0 0 0",
+                dur: 500,
+                easing: "easeInQuad",
+              });
+              updateStatus("\u{1FA9F} Window closed.");
+            }
+            playClickSound();
+          });
+          this.el.addEventListener("mouseenter", function () {
+            var h = document.getElementById("interact-hint");
+            if (h)
+              h.textContent = self.open
+                ? "\u{1FA9F} Click to close window"
+                : "\u{1FA9F} Click to open window";
+          });
+          this.el.addEventListener("mouseleave", function () {
+            var h = document.getElementById("interact-hint");
+            if (h) h.textContent = "";
+          });
+        },
+      });
+
       /* Boundary check — keeps player inside room */
       AFRAME.registerComponent("boundary-check", {
+        schema: { enabled: { default: true } },
         tick: function () {
+          if (!this.data.enabled) return;
           var p = this.el.object3D.position;
           p.x = Math.max(-8.2, Math.min(8.2, p.x));
-          p.z = Math.max(-9.2, Math.min(3.5, p.z));
+          p.z = Math.max(-9.2, Math.min(1.5, p.z));
+        },
+      });
+
+      /* Door toggle — click to open/close front door with smart boundary */
+      AFRAME.registerComponent("door-toggle", {
+        init: function () {
+          this.open = false;
+          var self = this;
+          var el = this.el;
+          var hint = document.getElementById("interact-hint");
+          el.addEventListener("click", function () {
+            var rig = document.getElementById("rig");
+            var playerZ = rig.object3D.position.z;
+            self.open = !self.open;
+            if (self.open) {
+              el.setAttribute(
+                "animation__door",
+                "property: rotation; to: 0 -100 0; dur: 600; easing: easeInOutQuad",
+              );
+              rig.setAttribute("boundary-check", "enabled: false");
+              if (typeof updateStatus === "function")
+                updateStatus("\uD83D\uDEAA Door opened");
+            } else {
+              el.setAttribute(
+                "animation__door",
+                "property: rotation; to: 0 0 0; dur: 600; easing: easeInOutQuad",
+              );
+              if (playerZ < 2.5) {
+                rig.setAttribute("boundary-check", "enabled: true");
+                if (typeof updateStatus === "function")
+                  updateStatus("\uD83D\uDEAA Door closed \u2014 inside room");
+              } else {
+                rig.setAttribute("boundary-check", "enabled: false");
+                if (typeof updateStatus === "function")
+                  updateStatus("\uD83D\uDEAA Door closed \u2014 free roam!");
+              }
+            }
+            if (typeof playClickSound === "function") playClickSound();
+            if (typeof playWhoosh === "function") playWhoosh();
+          });
+          el.addEventListener("mouseenter", function () {
+            if (hint)
+              hint.textContent =
+                "\uD83D\uDEAA Click to " +
+                (self.open ? "close" : "open") +
+                " door";
+          });
+          el.addEventListener("mouseleave", function () {
+            if (hint) hint.textContent = "";
+          });
         },
       });
 
@@ -346,6 +439,23 @@
           var el = this.el;
           el.setAttribute("light", "intensity", 6);
           playThunder();
+          /* Camera shake on thunder */
+          var cam = document.getElementById("camera");
+          if (cam) {
+            cam.setAttribute("animation__shake", {
+              property: "position",
+              from: "0 1.66 0.02",
+              to: "0 1.60 -0.02",
+              dur: 80,
+              dir: "alternate",
+              loop: 4,
+              easing: "easeInOutSine",
+            });
+            setTimeout(function () {
+              cam.removeAttribute("animation__shake");
+              cam.setAttribute("position", "0 1.63 0");
+            }, 500);
+          }
           setTimeout(function () {
             el.setAttribute("light", "intensity", 0);
           }, 80);
@@ -414,6 +524,66 @@
             }
           }, 140);
           playEasterEgg();
+        },
+      });
+
+      /* Dust motes — floating golden particles in the room */
+      AFRAME.registerComponent("dust-motes", {
+        init: function () {
+          this.motes = [];
+          for (var i = 0; i < 35; i++) {
+            var m = document.createElement("a-sphere");
+            var x = (Math.random() - 0.5) * 14;
+            var y = 0.5 + Math.random() * 3;
+            var z = -1 + Math.random() * -8;
+            m.setAttribute("position", x + " " + y + " " + z);
+            m.setAttribute("radius", "0.008");
+            m.setAttribute("color", "#93c5fd");
+            m.setAttribute(
+              "material",
+              "emissive:#93c5fd; emissiveIntensity:0.6; opacity:0.45; transparent:true",
+            );
+            this.el.appendChild(m);
+            this.motes.push({
+              el: m,
+              ox: x,
+              oy: y,
+              oz: z,
+              sx: 0.2 + Math.random() * 0.4,
+              sy: 0.15 + Math.random() * 0.25,
+              sz: 0.18 + Math.random() * 0.35,
+              ph: Math.random() * Math.PI * 2,
+            });
+          }
+        },
+        tick: function (t) {
+          var s = t / 1000;
+          for (var i = 0; i < this.motes.length; i++) {
+            var m = this.motes[i];
+            var p = m.el.object3D.position;
+            p.x = m.ox + Math.sin(s * m.sx + m.ph) * 0.3;
+            p.y = m.oy + Math.sin(s * m.sy + m.ph * 2) * 0.15;
+            p.z = m.oz + Math.cos(s * m.sz + m.ph) * 0.2;
+          }
+        },
+      });
+
+      /* Pendulum — swinging clock pendulum */
+      AFRAME.registerComponent("pendulum", {
+        schema: {
+          speed: { type: "number", default: 2000 },
+          angle: { type: "number", default: 15 },
+        },
+        init: function () {
+          this.el.setAttribute("animation__swing", {
+            property: "rotation",
+            from: "0 0 " + -this.data.angle,
+            to: "0 0 " + this.data.angle,
+            dur: this.data.speed,
+            dir: "alternate",
+            loop: true,
+            easing: "easeInOutSine",
+          });
         },
       });
 
@@ -586,11 +756,44 @@
           n.start();
         } catch (e) {}
       }
+      /* Fireplace crackling audio — random micro-pops */
+      var crackleInterval = null;
+      function startFireCrackle() {
+        if (crackleInterval) return;
+        crackleInterval = setInterval(
+          function () {
+            try {
+              var c = getAudioCtx();
+              var len = Math.floor(
+                c.sampleRate * (0.02 + Math.random() * 0.05),
+              );
+              var buf = c.createBuffer(1, len, c.sampleRate);
+              var d = buf.getChannelData(0);
+              for (var i = 0; i < len; i++)
+                d[i] = (Math.random() * 2 - 1) * Math.exp((-i / len) * 3);
+              var src = c.createBufferSource();
+              src.buffer = buf;
+              var g = c.createGain();
+              g.gain.value = 0.02 + Math.random() * 0.03;
+              var hp = c.createBiquadFilter();
+              hp.type = "highpass";
+              hp.frequency.value = 900;
+              src.connect(hp);
+              hp.connect(g);
+              g.connect(c.destination);
+              src.start();
+            } catch (e) {}
+          },
+          150 + Math.floor(Math.random() * 280),
+        );
+      }
+
       document.addEventListener(
         "click",
         function () {
           startAmbience();
           startRainAudio();
+          startFireCrackle();
         },
         { once: true },
       );
@@ -599,6 +802,7 @@
         function () {
           startAmbience();
           startRainAudio();
+          startFireCrackle();
         },
         { once: true },
       );
@@ -628,10 +832,10 @@
           );
           if (btn) btn.textContent = "\u{1F319} Night";
         } else {
-          sky.setAttribute("color", "#170f0c");
+          sky.setAttribute("color", "#0a0a14");
           scene.setAttribute(
             "fog",
-            "type: exponential; color: #1d1410; density: 0.022",
+            "type: exponential; color: #0a0a14; density: 0.022",
           );
           if (btn) btn.textContent = "\u2600\uFE0F Day";
         }
@@ -734,12 +938,12 @@
     <a-scene
       renderer="colorManagement: true; physicallyCorrectLights: true"
       shadow="type: pcfsoft"
-      fog="type: exponential; color: #1d1410; density: 0.022"
+      fog="type: exponential; color: #0a0a14; density: 0.022"
     >
       <!-- Player rig: movement + collision boundaries -->
       <a-entity
         id="rig"
-        position="0 0 2"
+        position="0 0 0"
         wasd-controls="acceleration: 42"
         boundary-check
       >
@@ -757,12 +961,12 @@
       </a-entity>
 
       <!-- Environment shell -->
-      <a-sky color="#170f0c"></a-sky>
+      <a-sky color="#0a0a14"></a-sky>
       <a-plane
         rotation="-90 0 0"
         width="28"
         height="28"
-        color="#4a301f"
+        material="color: #1a1a2a; metalness: 0.35; roughness: 0.4"
         shadow="receive: true"
       ></a-plane>
 
@@ -772,7 +976,7 @@
         rotation="-90 0 0"
         width="7"
         height="5"
-        color="#5a1f24"
+        color="#1e3a5f"
         shadow="receive: true"
       ></a-plane>
       <a-ring
@@ -780,104 +984,698 @@
         rotation="-90 0 0"
         radius-inner="1.6"
         radius-outer="2.25"
-        color="#c9a454"
+        color="#3b82f6"
       ></a-ring>
 
       <!-- Walls and ceiling -->
-      <!-- Back wall — split into sections with window openings -->
-      <!-- Left section (far left to left window) -->
+      <!-- Back wall — split with window openings -->
       <a-box
-        position="-7.9 2.1 -10"
-        width="2.2"
+        position="-7.375 2.1 -10"
+        width="3.25"
         height="4.2"
         depth="0.3"
-        color="#d7c7ae"
+        color="#f0f0f5"
       ></a-box>
-      <!-- Between left window and fireplace -->
       <a-box
-        position="-2.1 2.1 -10"
-        width="2.5"
-        height="4.2"
+        position="-4.6 3.7 -10"
+        width="2.3"
+        height="1.0"
         depth="0.3"
-        color="#d7c7ae"
+        color="#f0f0f5"
       ></a-box>
-      <!-- Above left window -->
       <a-box
-        position="-4.6 3.55 -10"
-        width="2.6"
-        height="0.9"
+        position="-4.6 0.6 -10"
+        width="2.3"
+        height="1.2"
         depth="0.3"
-        color="#d7c7ae"
+        color="#f0f0f5"
       ></a-box>
-      <!-- Below left window -->
-      <a-box
-        position="-4.6 0.55 -10"
-        width="2.6"
-        height="1.1"
-        depth="0.3"
-        color="#d7c7ae"
-      ></a-box>
-      <!-- Center section (fireplace area) -->
       <a-box
         position="0 2.1 -10"
-        width="1.7"
+        width="6.9"
         height="4.2"
         depth="0.3"
-        color="#d7c7ae"
+        color="#f0f0f5"
       ></a-box>
-      <!-- Between fireplace and right window -->
       <a-box
-        position="2.1 2.1 -10"
-        width="2.5"
+        position="4.6 3.7 -10"
+        width="2.3"
+        height="1.0"
+        depth="0.3"
+        color="#f0f0f5"
+      ></a-box>
+      <a-box
+        position="4.6 0.6 -10"
+        width="2.3"
+        height="1.2"
+        depth="0.3"
+        color="#f0f0f5"
+      ></a-box>
+      <a-box
+        position="7.375 2.1 -10"
+        width="3.25"
         height="4.2"
         depth="0.3"
-        color="#d7c7ae"
-      ></a-box>
-      <!-- Above right window -->
-      <a-box
-        position="4.6 3.55 -10"
-        width="2.6"
-        height="0.9"
-        depth="0.3"
-        color="#d7c7ae"
-      ></a-box>
-      <!-- Below right window -->
-      <a-box
-        position="4.6 0.55 -10"
-        width="2.6"
-        height="1.1"
-        depth="0.3"
-        color="#d7c7ae"
-      ></a-box>
-      <!-- Right section (right window to far right) -->
-      <a-box
-        position="7.9 2.1 -10"
-        width="2.2"
-        height="4.2"
-        depth="0.3"
-        color="#d7c7ae"
+        color="#f0f0f5"
       ></a-box>
       <a-box
         position="-9 2.1 -4"
         width="0.3"
         height="4.2"
         depth="12"
-        color="#ccb89e"
+        color="#e0e4ea"
       ></a-box>
       <a-box
         position="9 2.1 -4"
         width="0.3"
         height="4.2"
         depth="12"
-        color="#ccb89e"
+        color="#e0e4ea"
       ></a-box>
       <a-box
         position="0 4.2 -4"
         width="18"
         height="0.3"
         depth="12"
-        color="#efe5d2"
+        color="#f5f5f8"
       ></a-box>
+
+      <!-- ===== Front Wall with door opening ===== -->
+      <!-- Left section of front wall -->
+      <a-box
+        position="-4.85 2.1 2"
+        width="8.3"
+        height="4.2"
+        depth="0.3"
+        color="#f0f0f5"
+      ></a-box>
+      <!-- Right section of front wall -->
+      <a-box
+        position="4.85 2.1 2"
+        width="8.3"
+        height="4.2"
+        depth="0.3"
+        color="#f0f0f5"
+      ></a-box>
+      <!-- Top section above door -->
+      <a-box
+        position="0 3.65 2"
+        width="1.4"
+        height="1.1"
+        depth="0.3"
+        color="#f0f0f5"
+      ></a-box>
+
+      <!-- Front Door frame (dark trim — left, right, top strips) -->
+      <a-box
+        position="-0.6 1.3 2"
+        width="0.15"
+        height="2.6"
+        depth="0.32"
+        color="#0f0f1a"
+      ></a-box>
+      <a-box
+        position="0.6 1.3 2"
+        width="0.15"
+        height="2.6"
+        depth="0.32"
+        color="#0f0f1a"
+      ></a-box>
+      <a-box
+        position="0 2.68 2"
+        width="1.35"
+        height="0.15"
+        depth="0.32"
+        color="#0f0f1a"
+      ></a-box>
+      <!-- Door panel — hinged on left edge (x = -0.55) -->
+      <a-entity id="front-door-pivot" position="-0.55 1.3 2" door-toggle>
+        <a-box
+          class="interactable"
+          position="0.5 0 0"
+          width="1.0"
+          height="2.45"
+          depth="0.1"
+          color="#1a1a2a"
+          shadow="cast: true"
+        >
+          <!-- Door panels (raised details) -->
+          <a-box
+            position="0 0.5 0.06"
+            width="0.65"
+            height="0.75"
+            depth="0.015"
+            color="#2a2a35"
+          ></a-box>
+          <a-box
+            position="0 -0.45 0.06"
+            width="0.65"
+            height="0.65"
+            depth="0.015"
+            color="#2a2a35"
+          ></a-box>
+          <!-- Door handle (inside) -->
+          <a-sphere
+            position="0.35 0 0.07"
+            radius="0.04"
+            color="#c0c0c0"
+            material="metalness:0.8; roughness:0.2"
+          ></a-sphere>
+          <!-- Door handle (outside) -->
+          <a-sphere
+            position="0.35 0 -0.07"
+            radius="0.04"
+            color="#c0c0c0"
+            material="metalness:0.8; roughness:0.2"
+          ></a-sphere>
+        </a-box>
+      </a-entity>
+
+      <!-- ===== HOUSE EXTERIOR (visible from outside, z > 2) ===== -->
+      <!-- Peaked roof / gable -->
+      <a-entity position="0 4.35 2.15">
+        <!-- Main roof left slope -->
+        <a-box
+          position="-4.5 1.1 0"
+          width="11"
+          height="0.15"
+          depth="2.2"
+          rotation="0 0 18"
+          color="#1a1a2a"
+          shadow="cast: true"
+        ></a-box>
+        <!-- Main roof right slope -->
+        <a-box
+          position="4.5 1.1 0"
+          width="11"
+          height="0.15"
+          depth="2.2"
+          rotation="0 0 -18"
+          color="#1a1a2a"
+          shadow="cast: true"
+        ></a-box>
+        <!-- Ridge beam -->
+        <a-box
+          position="0 2.55 0"
+          width="1.0"
+          height="0.2"
+          depth="2.4"
+          color="#0f0f1a"
+        ></a-box>
+        <!-- Gable triangle fill -->
+        <a-triangle
+          vertex-a="0 2.55 0.05"
+          vertex-b="-10 0 0.05"
+          vertex-c="10 0 0.05"
+          material="color: #d0d8e2; side: double"
+        ></a-triangle>
+      </a-entity>
+
+      <!-- Front porch overhang -->
+      <a-box
+        position="0 3.15 3.2"
+        width="4.5"
+        height="0.12"
+        depth="2.4"
+        color="#1a1a2a"
+        shadow="cast: true; receive: true"
+      ></a-box>
+      <!-- Porch support columns -->
+      <a-cylinder
+        position="-2.0 1.6 4.3"
+        radius="0.12"
+        height="3.2"
+        color="#f0f0f5"
+        shadow="cast: true"
+      ></a-cylinder>
+      <a-cylinder
+        position="2.0 1.6 4.3"
+        radius="0.12"
+        height="3.2"
+        color="#f0f0f5"
+        shadow="cast: true"
+      ></a-cylinder>
+      <!-- Porch column bases -->
+      <a-box
+        position="-2.0 0.05 4.3"
+        width="0.35"
+        height="0.1"
+        depth="0.35"
+        color="#e0e4ea"
+      ></a-box>
+      <a-box
+        position="2.0 0.05 4.3"
+        width="0.35"
+        height="0.1"
+        depth="0.35"
+        color="#e0e4ea"
+      ></a-box>
+      <!-- Porch column capitals -->
+      <a-box
+        position="-2.0 3.1 4.3"
+        width="0.35"
+        height="0.08"
+        depth="0.35"
+        color="#e0e4ea"
+      ></a-box>
+      <a-box
+        position="2.0 3.1 4.3"
+        width="0.35"
+        height="0.08"
+        depth="0.35"
+        color="#e0e4ea"
+      ></a-box>
+
+      <!-- Porch floor / step -->
+      <a-box
+        position="0 0.03 3.5"
+        width="5"
+        height="0.06"
+        depth="3.0"
+        color="#d0d4da"
+        shadow="receive: true"
+      ></a-box>
+      <!-- Front steps -->
+      <a-box
+        position="0 -0.08 5.15"
+        width="2.0"
+        height="0.18"
+        depth="0.6"
+        color="#d0d4da"
+        shadow="cast: true"
+      ></a-box>
+      <a-box
+        position="0 -0.24 5.65"
+        width="2.2"
+        height="0.16"
+        depth="0.5"
+        color="#c8cdd4"
+        shadow="cast: true"
+      ></a-box>
+
+      <!-- Decorative exterior windows (left of door) -->
+      <a-box
+        position="-3.2 2.0 2.25"
+        width="1.3"
+        height="1.5"
+        depth="0.06"
+        color="#0f0f1a"
+      ></a-box>
+      <a-plane
+        position="-3.2 2.0 2.29"
+        width="1.1"
+        height="1.3"
+        color="#1e3a5f"
+        material="opacity:0.45; transparent:true; emissive:#93c5fd; emissiveIntensity:0.08"
+      ></a-plane>
+      <a-box
+        position="-3.2 2.0 2.3"
+        width="0.06"
+        height="1.3"
+        depth="0.02"
+        color="#0f0f1a"
+      ></a-box>
+      <a-box
+        position="-3.2 2.0 2.3"
+        width="1.1"
+        height="0.06"
+        depth="0.02"
+        color="#0f0f1a"
+      ></a-box>
+      <!-- Window shutters left -->
+      <a-box
+        position="-3.95 2.0 2.26"
+        width="0.18"
+        height="1.5"
+        depth="0.04"
+        color="#1e3a5f"
+      ></a-box>
+      <a-box
+        position="-2.45 2.0 2.26"
+        width="0.18"
+        height="1.5"
+        depth="0.04"
+        color="#1e3a5f"
+      ></a-box>
+
+      <!-- Decorative exterior windows (right of door) -->
+      <a-box
+        position="3.2 2.0 2.25"
+        width="1.3"
+        height="1.5"
+        depth="0.06"
+        color="#0f0f1a"
+      ></a-box>
+      <a-plane
+        position="3.2 2.0 2.29"
+        width="1.1"
+        height="1.3"
+        color="#1e3a5f"
+        material="opacity:0.45; transparent:true; emissive:#93c5fd; emissiveIntensity:0.08"
+      ></a-plane>
+      <a-box
+        position="3.2 2.0 2.3"
+        width="0.06"
+        height="1.3"
+        depth="0.02"
+        color="#0f0f1a"
+      ></a-box>
+      <a-box
+        position="3.2 2.0 2.3"
+        width="1.1"
+        height="0.06"
+        depth="0.02"
+        color="#0f0f1a"
+      ></a-box>
+      <!-- Window shutters right -->
+      <a-box
+        position="2.45 2.0 2.26"
+        width="0.18"
+        height="1.5"
+        depth="0.04"
+        color="#1e3a5f"
+      ></a-box>
+      <a-box
+        position="3.95 2.0 2.26"
+        width="0.18"
+        height="1.5"
+        depth="0.04"
+        color="#1e3a5f"
+      ></a-box>
+
+      <!-- House number plate -->
+      <a-box
+        position="1.2 2.8 2.18"
+        width="0.35"
+        height="0.25"
+        depth="0.03"
+        color="#f0f0f5"
+      ></a-box>
+      <a-text
+        position="1.2 2.8 2.2"
+        value="42"
+        align="center"
+        color="#1a1a2a"
+        width="1.2"
+      ></a-text>
+
+      <!-- Porch light fixtures -->
+      <a-entity position="-1.5 2.8 2.3">
+        <a-box width="0.15" height="0.22" depth="0.1" color="#0f0f1a"></a-box>
+        <a-sphere
+          position="0 -0.05 0"
+          radius="0.06"
+          color="#93c5fd"
+          material="emissive:#93c5fd; emissiveIntensity:0.6"
+        ></a-sphere>
+        <a-entity
+          light="type: point; color: #93c5fd; intensity: 0.5; distance: 6; decay: 2"
+        ></a-entity>
+      </a-entity>
+      <a-entity position="1.5 2.8 2.3">
+        <a-box width="0.15" height="0.22" depth="0.1" color="#0f0f1a"></a-box>
+        <a-sphere
+          position="0 -0.05 0"
+          radius="0.06"
+          color="#93c5fd"
+          material="emissive:#93c5fd; emissiveIntensity:0.6"
+        ></a-sphere>
+        <a-entity
+          light="type: point; color: #93c5fd; intensity: 0.5; distance: 6; decay: 2"
+        ></a-entity>
+      </a-entity>
+
+      <!-- Welcome mat -->
+      <a-box
+        position="0 0.04 2.8"
+        width="0.9"
+        height="0.02"
+        depth="0.55"
+        color="#1e3a5f"
+      ></a-box>
+      <a-text
+        position="0 0.06 2.8"
+        value="WELCOME"
+        rotation="-90 0 0"
+        align="center"
+        color="#93c5fd"
+        width="1.8"
+      ></a-text>
+
+      <!-- Garden path from steps -->
+      <a-box
+        position="0 -0.3 7.5"
+        width="1.6"
+        height="0.02"
+        depth="4.0"
+        color="#a0a8b4"
+        shadow="receive: true"
+      ></a-box>
+      <!-- Path edge stones -->
+      <a-box
+        position="-0.9 -0.28 6.5"
+        width="0.12"
+        height="0.06"
+        depth="0.5"
+        color="#c0c4cc"
+      ></a-box>
+      <a-box
+        position="0.9 -0.28 6.5"
+        width="0.12"
+        height="0.06"
+        depth="0.5"
+        color="#c0c4cc"
+      ></a-box>
+      <a-box
+        position="-0.9 -0.28 7.8"
+        width="0.12"
+        height="0.06"
+        depth="0.5"
+        color="#c0c4cc"
+      ></a-box>
+      <a-box
+        position="0.9 -0.28 7.8"
+        width="0.12"
+        height="0.06"
+        depth="0.5"
+        color="#c0c4cc"
+      ></a-box>
+
+      <!-- Grass / yard ground -->
+      <a-plane
+        position="0 -0.32 10"
+        rotation="-90 0 0"
+        width="40"
+        height="30"
+        color="#2d5a3d"
+        shadow="receive: true"
+      ></a-plane>
+
+      <!-- Hedges flanking the front -->
+      <a-box
+        position="-5.5 0.55 3.5"
+        width="3.0"
+        height="1.1"
+        depth="0.8"
+        color="#1e5a32"
+        material="roughness:0.9"
+      ></a-box>
+      <a-box
+        position="5.5 0.55 3.5"
+        width="3.0"
+        height="1.1"
+        depth="0.8"
+        color="#1e5a32"
+        material="roughness:0.9"
+      ></a-box>
+      <!-- Smaller ornamental bushes -->
+      <a-sphere
+        position="-3.5 0.5 4.0"
+        radius="0.55"
+        color="#2a6b3a"
+        material="roughness:0.9"
+      ></a-sphere>
+      <a-sphere
+        position="3.5 0.5 4.0"
+        radius="0.55"
+        color="#2a6b3a"
+        material="roughness:0.9"
+      ></a-sphere>
+
+      <!-- Picket fence -->
+      <a-box
+        position="-8 0.4 6"
+        width="0.08"
+        height="0.8"
+        depth="0.05"
+        color="#f0f0f5"
+      ></a-box>
+      <a-box
+        position="-7.5 0.4 6"
+        width="0.08"
+        height="0.8"
+        depth="0.05"
+        color="#f0f0f5"
+      ></a-box>
+      <a-box
+        position="-7.0 0.4 6"
+        width="0.08"
+        height="0.8"
+        depth="0.05"
+        color="#f0f0f5"
+      ></a-box>
+      <a-box
+        position="-6.5 0.4 6"
+        width="0.08"
+        height="0.8"
+        depth="0.05"
+        color="#f0f0f5"
+      ></a-box>
+      <a-box
+        position="-6.0 0.4 6"
+        width="0.08"
+        height="0.8"
+        depth="0.05"
+        color="#f0f0f5"
+      ></a-box>
+      <a-box
+        position="-8 0.65 6"
+        width="2.2"
+        height="0.06"
+        depth="0.04"
+        color="#e0e4ea"
+      ></a-box>
+      <a-box
+        position="-8 0.25 6"
+        width="2.2"
+        height="0.06"
+        depth="0.04"
+        color="#e0e4ea"
+      ></a-box>
+      <a-box
+        position="8 0.4 6"
+        width="0.08"
+        height="0.8"
+        depth="0.05"
+        color="#f0f0f5"
+      ></a-box>
+      <a-box
+        position="7.5 0.4 6"
+        width="0.08"
+        height="0.8"
+        depth="0.05"
+        color="#f0f0f5"
+      ></a-box>
+      <a-box
+        position="7.0 0.4 6"
+        width="0.08"
+        height="0.8"
+        depth="0.05"
+        color="#f0f0f5"
+      ></a-box>
+      <a-box
+        position="6.5 0.4 6"
+        width="0.08"
+        height="0.8"
+        depth="0.05"
+        color="#f0f0f5"
+      ></a-box>
+      <a-box
+        position="6.0 0.4 6"
+        width="0.08"
+        height="0.8"
+        depth="0.05"
+        color="#f0f0f5"
+      ></a-box>
+      <a-box
+        position="8 0.65 6"
+        width="2.2"
+        height="0.06"
+        depth="0.04"
+        color="#e0e4ea"
+      ></a-box>
+      <a-box
+        position="8 0.25 6"
+        width="2.2"
+        height="0.06"
+        depth="0.04"
+        color="#e0e4ea"
+      ></a-box>
+
+      <!-- Lamp posts by the garden path -->
+      <a-entity position="-2.5 0 7">
+        <a-cylinder
+          radius="0.05"
+          height="2.8"
+          color="#1a1a2a"
+          position="0 1.4 0"
+        ></a-cylinder>
+        <a-box
+          position="0 2.85 0"
+          width="0.22"
+          height="0.3"
+          depth="0.22"
+          color="#0f0f1a"
+        ></a-box>
+        <a-sphere
+          position="0 2.75 0"
+          radius="0.08"
+          color="#93c5fd"
+          material="emissive:#93c5fd; emissiveIntensity:0.5"
+        ></a-sphere>
+        <a-entity
+          position="0 2.8 0"
+          light="type: point; color: #93c5fd; intensity: 0.4; distance: 8; decay: 2"
+        ></a-entity>
+      </a-entity>
+      <a-entity position="2.5 0 7">
+        <a-cylinder
+          radius="0.05"
+          height="2.8"
+          color="#1a1a2a"
+          position="0 1.4 0"
+        ></a-cylinder>
+        <a-box
+          position="0 2.85 0"
+          width="0.22"
+          height="0.3"
+          depth="0.22"
+          color="#0f0f1a"
+        ></a-box>
+        <a-sphere
+          position="0 2.75 0"
+          radius="0.08"
+          color="#93c5fd"
+          material="emissive:#93c5fd; emissiveIntensity:0.5"
+        ></a-sphere>
+        <a-entity
+          position="0 2.8 0"
+          light="type: point; color: #93c5fd; intensity: 0.4; distance: 8; decay: 2"
+        ></a-entity>
+      </a-entity>
+
+      <!-- Mailbox -->
+      <a-entity position="4.0 0 8">
+        <a-cylinder
+          radius="0.04"
+          height="1.2"
+          color="#1a1a2a"
+          position="0 0.6 0"
+        ></a-cylinder>
+        <a-box
+          position="0 1.25 0"
+          width="0.35"
+          height="0.25"
+          depth="0.2"
+          color="#3b82f6"
+        ></a-box>
+      </a-entity>
+
+      <!-- Exterior ambient light (softer outdoors) -->
+      <a-entity
+        position="0 6 8"
+        light="type: point; color: #a8c9ff; intensity: 0.6; distance: 25; decay: 1.5"
+      ></a-entity>
 
       <!-- ===== Left bar — Alcoholic Drinks ===== -->
       <!-- Counter -->
@@ -886,7 +1684,7 @@
         width="1.4"
         depth="4.4"
         height="1.1"
-        color="#5d3a25"
+        color="#1a1a2a"
         shadow="cast: true; receive: true"
       ></a-box>
       <!-- Polished counter-top -->
@@ -895,7 +1693,7 @@
         width="1.5"
         depth="4.6"
         height="0.06"
-        color="#1a1a1a"
+        color="#0f0f1a"
         shadow="cast: true"
       ></a-box>
       <!-- Back shelf rack against wall -->
@@ -904,21 +1702,21 @@
         width="0.18"
         depth="4.2"
         height="0.8"
-        color="#4a2d1d"
+        color="#1a1a2a"
       ></a-box>
       <a-box
         position="-8.7 1.95 -4"
         width="0.22"
         depth="4.2"
         height="0.04"
-        color="#6d452b"
+        color="#2a2a35"
       ></a-box>
       <a-box
         position="-8.7 1.55 -4"
         width="0.22"
         depth="4.2"
         height="0.04"
-        color="#6d452b"
+        color="#2a2a35"
       ></a-box>
       <!-- Bottles row (decorative) -->
       <a-cylinder
@@ -937,7 +1735,7 @@
         position="-8.65 1.72 -3.7"
         radius="0.06"
         height="0.28"
-        color="#c9a454"
+        color="#3b82f6"
       ></a-cylinder>
       <a-cylinder
         position="-8.65 1.72 -4.3"
@@ -988,7 +1786,7 @@
       ></a-cylinder>
       <!-- Warm bar light -->
       <a-entity
-        light="type: point; color: #ffcc77; intensity: 0.6; distance: 5; decay: 2"
+        light="type: point; color: #93c5fd; intensity: 0.6; distance: 5; decay: 2"
         position="-8.1 2.0 -4"
       ></a-entity>
       <!-- Label -->
@@ -996,7 +1794,7 @@
         <a-text
           value="Alcoholic Drinks"
           align="center"
-          color="#ffde94"
+          color="#93c5fd"
           width="3.5"
           font="mozillavr"
         ></a-text>
@@ -1009,7 +1807,7 @@
         width="1.4"
         depth="4.4"
         height="1.1"
-        color="#5d3a25"
+        color="#1a1a2a"
         shadow="cast: true; receive: true"
       ></a-box>
       <!-- Polished counter-top -->
@@ -1018,7 +1816,7 @@
         width="1.5"
         depth="4.6"
         height="0.06"
-        color="#1a1a1a"
+        color="#0f0f1a"
         shadow="cast: true"
       ></a-box>
       <!-- Back shelf rack against wall -->
@@ -1027,21 +1825,21 @@
         width="0.18"
         depth="4.2"
         height="0.8"
-        color="#4a2d1d"
+        color="#1a1a2a"
       ></a-box>
       <a-box
         position="8.7 1.95 -4"
         width="0.22"
         depth="4.2"
         height="0.04"
-        color="#6d452b"
+        color="#2a2a35"
       ></a-box>
       <a-box
         position="8.7 1.55 -4"
         width="0.22"
         depth="4.2"
         height="0.04"
-        color="#6d452b"
+        color="#2a2a35"
       ></a-box>
       <!-- Bottles row (decorative) -->
       <a-cylinder
@@ -1111,7 +1909,7 @@
       ></a-cylinder>
       <!-- Cool bar light -->
       <a-entity
-        light="type: point; color: #aadcff; intensity: 0.6; distance: 5; decay: 2"
+        light="type: point; color: #93c5fd; intensity: 0.6; distance: 5; decay: 2"
         position="8.1 2.0 -4"
       ></a-entity>
       <!-- Label -->
@@ -1119,7 +1917,7 @@
         <a-text
           value="Soft Drinks"
           align="center"
-          color="#aadcff"
+          color="#93c5fd"
           width="3.5"
           font="mozillavr"
         ></a-text>
@@ -1131,14 +1929,14 @@
         width="18"
         height="0.18"
         depth="0.15"
-        color="#6d452b"
+        color="#1a1a2a"
       ></a-box>
       <a-box
         position="0 2.6 -9.85"
         width="18"
         height="0.14"
         depth="0.15"
-        color="#6d452b"
+        color="#1a1a2a"
       ></a-box>
 
       <!-- Decorative columns to frame the hall -->
@@ -1146,56 +1944,56 @@
         position="-6.8 1.5 -8.9"
         radius="0.24"
         height="3"
-        color="#ead8bb"
+        color="#f0f0f5"
         shadow="cast: true"
       ></a-cylinder>
       <a-cylinder
         position="6.8 1.5 -8.9"
         radius="0.24"
         height="3"
-        color="#ead8bb"
+        color="#f0f0f5"
         shadow="cast: true"
       ></a-cylinder>
       <a-cylinder
         position="-6.8 1.5 -1.1"
         radius="0.24"
         height="3"
-        color="#ead8bb"
+        color="#f0f0f5"
         shadow="cast: true"
       ></a-cylinder>
       <a-cylinder
         position="6.8 1.5 -1.1"
         radius="0.24"
         height="3"
-        color="#ead8bb"
+        color="#f0f0f5"
         shadow="cast: true"
       ></a-cylinder>
       <a-torus
         position="-6.8 3.01 -8.9"
         radius="0.29"
         radius-tubular="0.045"
-        color="#c9a454"
+        color="#3b82f6"
         rotation="90 0 0"
       ></a-torus>
       <a-torus
         position="6.8 3.01 -8.9"
         radius="0.29"
         radius-tubular="0.045"
-        color="#c9a454"
+        color="#3b82f6"
         rotation="90 0 0"
       ></a-torus>
       <a-torus
         position="-6.8 3.01 -1.1"
         radius="0.29"
         radius-tubular="0.045"
-        color="#c9a454"
+        color="#3b82f6"
         rotation="90 0 0"
       ></a-torus>
       <a-torus
         position="6.8 3.01 -1.1"
         radius="0.29"
         radius-tubular="0.045"
-        color="#c9a454"
+        color="#3b82f6"
         rotation="90 0 0"
       ></a-torus>
 
@@ -1204,54 +2002,156 @@
       <!-- ============================================= -->
 
       <!-- LEFT WINDOW — Glass pane (semi-transparent to see through) -->
-      <a-plane
-        position="-4.6 2.2 -9.82"
-        width="2.3"
-        height="2.0"
-        color="#3a506b"
-        material="opacity:0.25; transparent:true; side:double"
-      ></a-plane>
-      <!-- Window frame (outer) -->
+      <!-- Pivot wrapper: hinged on left edge at x=-5.75 -->
+      <a-entity
+        id="left-window-pivot"
+        position="-5.75 2.2 -9.82"
+        window-toggle="side: left"
+      >
+        <!-- Wall-colored backing panel (covers opening when closed) -->
+        <a-plane
+          position="1.15 0 -0.18"
+          width="2.3"
+          height="2.0"
+          color="#f0f0f5"
+          material="side: double"
+        ></a-plane>
+        <a-plane
+          class="interactable"
+          position="1.15 0 0"
+          width="2.3"
+          height="2.0"
+          color="#3a506b"
+          material="opacity:0.15; transparent:true; side:double"
+        ></a-plane>
+        <!-- Muntins (cross bars) on glass -->
+        <a-box
+          position="1.15 0 0.05"
+          width="0.06"
+          height="2.0"
+          depth="0.04"
+          color="#4a301f"
+        ></a-box>
+        <a-box
+          position="1.15 0 0.05"
+          width="2.3"
+          height="0.06"
+          depth="0.04"
+          color="#4a301f"
+        ></a-box>
+        <!-- Rain streaks on window glass -->
+        <a-entity position="1.15 0 0.01">
+          <a-cylinder
+            position="-0.3 0.4 0"
+            radius="0.005"
+            height="0.4"
+            color="#8ab4f8"
+            material="opacity:0.4; transparent:true"
+            animation="property:position; from:-0.3 0.8 0; to:-0.3 -0.6 0; dur:1200; loop:true; easing:linear"
+          ></a-cylinder>
+          <a-cylinder
+            position="0.15 0.2 0"
+            radius="0.005"
+            height="0.35"
+            color="#8ab4f8"
+            material="opacity:0.35; transparent:true"
+            animation="property:position; from:0.15 0.7 0; to:0.15 -0.7 0; dur:1000; loop:true; easing:linear"
+          ></a-cylinder>
+          <a-cylinder
+            position="0.5 0.5 0"
+            radius="0.005"
+            height="0.45"
+            color="#8ab4f8"
+            material="opacity:0.4; transparent:true"
+            animation="property:position; from:0.5 0.9 0; to:0.5 -0.5 0; dur:1400; loop:true; easing:linear"
+          ></a-cylinder>
+          <a-cylinder
+            position="-0.7 0.1 0"
+            radius="0.004"
+            height="0.3"
+            color="#8ab4f8"
+            material="opacity:0.3; transparent:true"
+            animation="property:position; from:-0.7 0.6 0; to:-0.7 -0.6 0; dur:900; loop:true; easing:linear"
+          ></a-cylinder>
+          <a-cylinder
+            position="0.8 0.3 0"
+            radius="0.004"
+            height="0.38"
+            color="#8ab4f8"
+            material="opacity:0.35; transparent:true"
+            animation="property:position; from:0.8 0.8 0; to:0.8 -0.5 0; dur:1100; loop:true; easing:linear"
+          ></a-cylinder>
+        </a-entity>
+      </a-entity>
+      <!-- Window frame (open border strips so you see through) -->
       <a-box
-        position="-4.6 2.2 -9.79"
+        position="-4.6 3.25 -9.79"
         width="2.5"
-        height="2.2"
-        depth="0.08"
-        color="#3e2a16"
-        material="emissive:#1a0e06; emissiveIntensity:0.1"
+        height="0.1"
+        depth="0.15"
+        color="#1a1a2a"
+        material="emissive:#0a0a14; emissiveIntensity:0.1"
       ></a-box>
-      <!-- Muntins (cross bars) -->
       <a-box
-        position="-4.6 2.2 -9.77"
-        width="0.06"
+        position="-4.6 1.15 -9.79"
+        width="2.5"
+        height="0.1"
+        depth="0.15"
+        color="#1a1a2a"
+        material="emissive:#0a0a14; emissiveIntensity:0.1"
+      ></a-box>
+      <a-box
+        position="-5.8 2.2 -9.79"
+        width="0.1"
         height="2.0"
-        depth="0.04"
-        color="#4a301f"
+        depth="0.15"
+        color="#1a1a2a"
+        material="emissive:#0a0a14; emissiveIntensity:0.1"
       ></a-box>
       <a-box
-        position="-4.6 2.2 -9.77"
-        width="2.3"
-        height="0.06"
-        depth="0.04"
-        color="#4a301f"
+        position="-3.4 2.2 -9.79"
+        width="0.1"
+        height="2.0"
+        depth="0.15"
+        color="#1a1a2a"
+        material="emissive:#0a0a14; emissiveIntensity:0.1"
       ></a-box>
-      <!-- Arch detail on top -->
-      <a-torus
-        position="-4.6 3.2 -9.78"
-        rotation="0 0 0"
-        radius="1.15"
-        radius-tubular="0.04"
-        theta-start="0"
-        theta-length="180"
-        color="#3e2a16"
-      ></a-torus>
+      <!-- Window reveal / depth recess -->
+      <a-box
+        position="-4.6 3.2 -9.9"
+        width="2.3"
+        height="0.05"
+        depth="0.2"
+        color="#d0d4da"
+      ></a-box>
+      <a-box
+        position="-4.6 1.2 -9.9"
+        width="2.3"
+        height="0.05"
+        depth="0.2"
+        color="#d0d4da"
+      ></a-box>
+      <a-box
+        position="-5.72 2.2 -9.9"
+        width="0.05"
+        height="2.0"
+        depth="0.2"
+        color="#d0d4da"
+      ></a-box>
+      <a-box
+        position="-3.48 2.2 -9.9"
+        width="0.05"
+        height="2.0"
+        depth="0.2"
+        color="#d0d4da"
+      ></a-box>
       <!-- Window sill -->
       <a-box
         position="-4.6 1.08 -9.65"
         width="2.7"
         height="0.09"
         depth="0.3"
-        color="#5d3a25"
+        color="#1a1a2a"
       ></a-box>
       <!-- Curtain rods + drapes -->
       <a-cylinder
@@ -1259,14 +2159,14 @@
         radius="0.025"
         height="2.8"
         rotation="0 0 90"
-        color="#8b6914"
+        color="#c0c0c0"
       ></a-cylinder>
       <a-box
         position="-5.65 2.15 -9.62"
         width="0.35"
         height="2.2"
         depth="0.04"
-        color="#6b1a24"
+        color="#1e3a5f"
         material="opacity:0.85; transparent:true"
         animation="property:rotation; from:0 -3 0; to:0 3 0; dur:3500; dir:alternate; loop:true; easing:easeInOutSine"
       ></a-box>
@@ -1275,103 +2175,162 @@
         width="0.35"
         height="2.2"
         depth="0.04"
-        color="#6b1a24"
+        color="#1e3a5f"
         material="opacity:0.85; transparent:true"
         animation="property:rotation; from:0 3 0; to:0 -3 0; dur:3500; dir:alternate; loop:true; easing:easeInOutSine"
       ></a-box>
-      <!-- Rain streaks on window glass -->
-      <a-entity position="-4.6 2.2 -9.81">
-        <a-cylinder
-          position="-0.3 0.4 0"
-          radius="0.005"
-          height="0.4"
-          color="#8ab4f8"
-          material="opacity:0.4; transparent:true"
-          animation="property:position; from:-0.3 0.8 0; to:-0.3 -0.6 0; dur:1200; loop:true; easing:linear"
-        ></a-cylinder>
-        <a-cylinder
-          position="0.15 0.2 0"
-          radius="0.005"
-          height="0.35"
-          color="#8ab4f8"
-          material="opacity:0.35; transparent:true"
-          animation="property:position; from:0.15 0.7 0; to:0.15 -0.7 0; dur:1000; loop:true; easing:linear"
-        ></a-cylinder>
-        <a-cylinder
-          position="0.5 0.5 0"
-          radius="0.005"
-          height="0.45"
-          color="#8ab4f8"
-          material="opacity:0.4; transparent:true"
-          animation="property:position; from:0.5 0.9 0; to:0.5 -0.5 0; dur:1400; loop:true; easing:linear"
-        ></a-cylinder>
-        <a-cylinder
-          position="-0.7 0.1 0"
-          radius="0.004"
-          height="0.3"
-          color="#8ab4f8"
-          material="opacity:0.3; transparent:true"
-          animation="property:position; from:-0.7 0.6 0; to:-0.7 -0.6 0; dur:900; loop:true; easing:linear"
-        ></a-cylinder>
-        <a-cylinder
-          position="0.8 0.3 0"
-          radius="0.004"
-          height="0.38"
-          color="#8ab4f8"
-          material="opacity:0.35; transparent:true"
-          animation="property:position; from:0.8 0.8 0; to:0.8 -0.5 0; dur:1100; loop:true; easing:linear"
-        ></a-cylinder>
-      </a-entity>
 
       <!-- RIGHT WINDOW — Glass pane -->
-      <a-plane
-        position="4.6 2.2 -9.82"
-        width="2.3"
-        height="2.0"
-        color="#3a506b"
-        material="opacity:0.25; transparent:true; side:double"
-      ></a-plane>
-      <!-- Window frame (outer) -->
+      <!-- Pivot wrapper: hinged on right edge at x=5.75 -->
+      <a-entity
+        id="right-window-pivot"
+        position="5.75 2.2 -9.82"
+        window-toggle="side: right"
+      >
+        <!-- Wall-colored backing panel (covers opening when closed) -->
+        <a-plane
+          position="-1.15 0 -0.18"
+          width="2.3"
+          height="2.0"
+          color="#f0f0f5"
+          material="side: double"
+        ></a-plane>
+        <a-plane
+          class="interactable"
+          position="-1.15 0 0"
+          width="2.3"
+          height="2.0"
+          color="#3a506b"
+          material="opacity:0.15; transparent:true; side:double"
+        ></a-plane>
+        <!-- Muntins on glass -->
+        <a-box
+          position="-1.15 0 0.05"
+          width="0.06"
+          height="2.0"
+          depth="0.04"
+          color="#4a301f"
+        ></a-box>
+        <a-box
+          position="-1.15 0 0.05"
+          width="2.3"
+          height="0.06"
+          depth="0.04"
+          color="#4a301f"
+        ></a-box>
+        <!-- Rain streaks on window glass -->
+        <a-entity position="-1.15 0 0.01">
+          <a-cylinder
+            position="-0.4 0.3 0"
+            radius="0.005"
+            height="0.4"
+            color="#8ab4f8"
+            material="opacity:0.4; transparent:true"
+            animation="property:position; from:-0.4 0.9 0; to:-0.4 -0.6 0; dur:1100; loop:true; easing:linear"
+          ></a-cylinder>
+          <a-cylinder
+            position="0.2 0.5 0"
+            radius="0.005"
+            height="0.35"
+            color="#8ab4f8"
+            material="opacity:0.35; transparent:true"
+            animation="property:position; from:0.2 0.8 0; to:0.2 -0.7 0; dur:950; loop:true; easing:linear"
+          ></a-cylinder>
+          <a-cylinder
+            position="0.6 0.1 0"
+            radius="0.005"
+            height="0.42"
+            color="#8ab4f8"
+            material="opacity:0.38; transparent:true"
+            animation="property:position; from:0.6 0.7 0; to:0.6 -0.6 0; dur:1300; loop:true; easing:linear"
+          ></a-cylinder>
+          <a-cylinder
+            position="-0.8 0 0"
+            radius="0.004"
+            height="0.3"
+            color="#8ab4f8"
+            material="opacity:0.3; transparent:true"
+            animation="property:position; from:-0.8 0.5 0; to:-0.8 -0.5 0; dur:850; loop:true; easing:linear"
+          ></a-cylinder>
+          <a-cylinder
+            position="0.9 0.4 0"
+            radius="0.004"
+            height="0.36"
+            color="#8ab4f8"
+            material="opacity:0.33; transparent:true"
+            animation="property:position; from:0.9 0.7 0; to:0.9 -0.6 0; dur:1050; loop:true; easing:linear"
+          ></a-cylinder>
+        </a-entity>
+      </a-entity>
+      <!-- Window frame (open border strips so you see through) -->
       <a-box
-        position="4.6 2.2 -9.79"
+        position="4.6 3.25 -9.79"
         width="2.5"
-        height="2.2"
-        depth="0.08"
-        color="#3e2a16"
-        material="emissive:#1a0e06; emissiveIntensity:0.1"
+        height="0.1"
+        depth="0.15"
+        color="#1a1a2a"
+        material="emissive:#0a0a14; emissiveIntensity:0.1"
       ></a-box>
-      <!-- Muntins -->
       <a-box
-        position="4.6 2.2 -9.77"
-        width="0.06"
+        position="4.6 1.15 -9.79"
+        width="2.5"
+        height="0.1"
+        depth="0.15"
+        color="#1a1a2a"
+        material="emissive:#0a0a14; emissiveIntensity:0.1"
+      ></a-box>
+      <a-box
+        position="3.4 2.2 -9.79"
+        width="0.1"
         height="2.0"
-        depth="0.04"
-        color="#4a301f"
+        depth="0.15"
+        color="#1a1a2a"
+        material="emissive:#0a0a14; emissiveIntensity:0.1"
       ></a-box>
       <a-box
-        position="4.6 2.2 -9.77"
-        width="2.3"
-        height="0.06"
-        depth="0.04"
-        color="#4a301f"
+        position="5.8 2.2 -9.79"
+        width="0.1"
+        height="2.0"
+        depth="0.15"
+        color="#1a1a2a"
+        material="emissive:#0a0a14; emissiveIntensity:0.1"
       ></a-box>
-      <!-- Arch detail -->
-      <a-torus
-        position="4.6 3.2 -9.78"
-        rotation="0 0 0"
-        radius="1.15"
-        radius-tubular="0.04"
-        theta-start="0"
-        theta-length="180"
-        color="#3e2a16"
-      ></a-torus>
+      <!-- Window reveal / depth recess -->
+      <a-box
+        position="4.6 3.2 -9.9"
+        width="2.3"
+        height="0.05"
+        depth="0.2"
+        color="#d0d4da"
+      ></a-box>
+      <a-box
+        position="4.6 1.2 -9.9"
+        width="2.3"
+        height="0.05"
+        depth="0.2"
+        color="#d0d4da"
+      ></a-box>
+      <a-box
+        position="3.48 2.2 -9.9"
+        width="0.05"
+        height="2.0"
+        depth="0.2"
+        color="#d0d4da"
+      ></a-box>
+      <a-box
+        position="5.72 2.2 -9.9"
+        width="0.05"
+        height="2.0"
+        depth="0.2"
+        color="#d0d4da"
+      ></a-box>
       <!-- Window sill -->
       <a-box
         position="4.6 1.08 -9.65"
         width="2.7"
         height="0.09"
         depth="0.3"
-        color="#5d3a25"
+        color="#1a1a2a"
       ></a-box>
       <!-- Curtain rods + drapes -->
       <a-cylinder
@@ -1379,14 +2338,14 @@
         radius="0.025"
         height="2.8"
         rotation="0 0 90"
-        color="#8b6914"
+        color="#c0c0c0"
       ></a-cylinder>
       <a-box
         position="3.55 2.15 -9.62"
         width="0.35"
         height="2.2"
         depth="0.04"
-        color="#6b1a24"
+        color="#1e3a5f"
         material="opacity:0.85; transparent:true"
         animation="property:rotation; from:0 -3 0; to:0 3 0; dur:3200; dir:alternate; loop:true; easing:easeInOutSine"
       ></a-box>
@@ -1395,53 +2354,50 @@
         width="0.35"
         height="2.2"
         depth="0.04"
-        color="#6b1a24"
+        color="#1e3a5f"
         material="opacity:0.85; transparent:true"
         animation="property:rotation; from:0 3 0; to:0 -3 0; dur:3200; dir:alternate; loop:true; easing:easeInOutSine"
       ></a-box>
-      <!-- Rain streaks on right window -->
-      <a-entity position="4.6 2.2 -9.81">
-        <a-cylinder
-          position="-0.4 0.3 0"
-          radius="0.005"
-          height="0.4"
-          color="#8ab4f8"
-          material="opacity:0.4; transparent:true"
-          animation="property:position; from:-0.4 0.9 0; to:-0.4 -0.6 0; dur:1100; loop:true; easing:linear"
-        ></a-cylinder>
-        <a-cylinder
-          position="0.2 0.5 0"
-          radius="0.005"
-          height="0.35"
-          color="#8ab4f8"
-          material="opacity:0.35; transparent:true"
-          animation="property:position; from:0.2 0.8 0; to:0.2 -0.7 0; dur:950; loop:true; easing:linear"
-        ></a-cylinder>
-        <a-cylinder
-          position="0.6 0.1 0"
-          radius="0.005"
-          height="0.42"
-          color="#8ab4f8"
-          material="opacity:0.38; transparent:true"
-          animation="property:position; from:0.6 0.7 0; to:0.6 -0.6 0; dur:1300; loop:true; easing:linear"
-        ></a-cylinder>
-        <a-cylinder
-          position="-0.8 0 0"
-          radius="0.004"
-          height="0.3"
-          color="#8ab4f8"
-          material="opacity:0.3; transparent:true"
-          animation="property:position; from:-0.8 0.5 0; to:-0.8 -0.5 0; dur:850; loop:true; easing:linear"
-        ></a-cylinder>
-        <a-cylinder
-          position="0.9 0.4 0"
-          radius="0.004"
-          height="0.36"
-          color="#8ab4f8"
-          material="opacity:0.33; transparent:true"
-          animation="property:position; from:0.9 0.7 0; to:0.9 -0.6 0; dur:1050; loop:true; easing:linear"
-        ></a-cylinder>
-      </a-entity>
+
+      <!-- ===== Light Shafts from windows ===== -->
+      <!-- Left window light shaft -->
+      <a-box
+        position="-4.2 1.5 -8.5"
+        width="1.6"
+        height="0.04"
+        depth="2.5"
+        rotation="-18 0 0"
+        material="color: #93c5fd; opacity: 0.06; transparent: true; emissive: #93c5fd; emissiveIntensity: 0.15"
+        animation="property: material.opacity; from: 0.04; to: 0.08; dur: 3000; dir: alternate; loop: true; easing: easeInOutSine"
+      ></a-box>
+      <a-box
+        position="-4.6 1.8 -8.8"
+        width="1.2"
+        height="0.04"
+        depth="2.0"
+        rotation="-22 5 0"
+        material="color: #60a5fa; opacity: 0.04; transparent: true; emissive: #60a5fa; emissiveIntensity: 0.12"
+        animation="property: material.opacity; from: 0.03; to: 0.06; dur: 4000; dir: alternate; loop: true; easing: easeInOutSine"
+      ></a-box>
+      <!-- Right window light shaft -->
+      <a-box
+        position="4.2 1.5 -8.5"
+        width="1.6"
+        height="0.04"
+        depth="2.5"
+        rotation="-18 0 0"
+        material="color: #93c5fd; opacity: 0.06; transparent: true; emissive: #93c5fd; emissiveIntensity: 0.15"
+        animation="property: material.opacity; from: 0.04; to: 0.08; dur: 3200; dir: alternate; loop: true; easing: easeInOutSine"
+      ></a-box>
+      <a-box
+        position="4.6 1.8 -8.8"
+        width="1.2"
+        height="0.04"
+        depth="2.0"
+        rotation="-22 -5 0"
+        material="color: #60a5fa; opacity: 0.04; transparent: true; emissive: #60a5fa; emissiveIntensity: 0.12"
+        animation="property: material.opacity; from: 0.03; to: 0.06; dur: 3800; dir: alternate; loop: true; easing: easeInOutSine"
+      ></a-box>
 
       <!-- ===== OUTDOOR STORM SCENE (behind back wall z < -10) ===== -->
       <!-- Storm sky backdrop -->
@@ -1656,21 +2612,21 @@
         width="2.25"
         height="1.7"
         depth="0.2"
-        color="#c8ae8a"
+        color="#e0e4ea"
       ></a-box>
       <a-box
         position="0 0.95 -9.64"
         width="1.45"
         height="1.1"
         depth="0.18"
-        color="#2a1a13"
+        color="#0f0f1a"
       ></a-box>
       <a-box
         position="0 1.62 -9.62"
         width="2.7"
         height="0.12"
         depth="0.45"
-        color="#6d452b"
+        color="#1a1a2a"
       ></a-box>
       <a-cone
         position="0 0.63 -9.58"
@@ -1694,7 +2650,7 @@
 
       <!-- Lighting stack: warm interior + cool moon fill -->
       <a-entity
-        light="type: ambient; intensity: 0.3; color: #ffe6ba"
+        light="type: ambient; intensity: 0.3; color: #c8d8ff"
       ></a-entity>
       <a-entity
         light="type: directional; intensity: 0.45; color: #a8c9ff"
@@ -1705,18 +2661,18 @@
       <a-entity
         id="chandelier-light"
         position="0 3.1 -4"
-        light="type: point; intensity: 1.45; distance: 16; decay: 2; color: #ffd08c"
+        light="type: point; intensity: 1.45; distance: 16; decay: 2; color: #93c5fd"
         animation="property: light.intensity; from: 1.35; to: 1.65; dur: 1800; dir: alternate; loop: true; easing: easeInOutSine"
       ></a-entity>
 
       <!-- Accent side lights for cinematic contrast -->
       <a-entity
-        light="type: spot; color: #ffe2ad; intensity: 0.85; angle: 28; penumbra: 0.45; distance: 18"
+        light="type: spot; color: #93c5fd; intensity: 0.85; angle: 28; penumbra: 0.45; distance: 18"
         position="-7.5 3.6 -4"
         rotation="-16 64 0"
       ></a-entity>
       <a-entity
-        light="type: spot; color: #ffe2ad; intensity: 0.85; angle: 28; penumbra: 0.45; distance: 18"
+        light="type: spot; color: #93c5fd; intensity: 0.85; angle: 28; penumbra: 0.45; distance: 18"
         position="7.5 3.6 -4"
         rotation="-16 -64 0"
       ></a-entity>
@@ -1726,23 +2682,23 @@
         position="0 3.85 -4"
         radius="0.03"
         height="0.7"
-        color="#d7b77a"
+        color="#c0c0c0"
       ></a-cylinder>
       <a-torus
         position="0 3.35 -4"
         radius="0.55"
         radius-tubular="0.03"
-        color="#b08b48"
+        color="#3b82f6"
       ></a-torus>
-      <a-sphere position="0 3.35 -4" radius="0.08" color="#e5c37e"></a-sphere>
-      <a-sphere position="0.45 3.3 -4" radius="0.06" color="#ffdca2"></a-sphere>
+      <a-sphere position="0 3.35 -4" radius="0.08" color="#ffffff"></a-sphere>
+      <a-sphere position="0.45 3.3 -4" radius="0.06" color="#93c5fd"></a-sphere>
       <a-sphere
         position="-0.45 3.3 -4"
         radius="0.06"
-        color="#ffdca2"
+        color="#93c5fd"
       ></a-sphere>
-      <a-sphere position="0 3.3 -3.55" radius="0.06" color="#ffdca2"></a-sphere>
-      <a-sphere position="0 3.3 -4.45" radius="0.06" color="#ffdca2"></a-sphere>
+      <a-sphere position="0 3.3 -3.55" radius="0.06" color="#93c5fd"></a-sphere>
+      <a-sphere position="0 3.3 -4.45" radius="0.06" color="#93c5fd"></a-sphere>
 
       <!-- Grand table (kept central object) -->
       <a-box
@@ -1752,7 +2708,7 @@
         width="2.4"
         depth="1.3"
         height="0.14"
-        color="#6b4229"
+        color="#1a1a2a"
         shadow="cast: true; receive: true"
       ></a-box>
 
@@ -1761,14 +2717,14 @@
         width="2.1"
         depth="1.08"
         height="0.01"
-        color="#efe5d2"
+        color="#f0f0f5"
       ></a-box>
       <a-box
         position="0 0.865 -4"
         width="0.09"
         depth="1.08"
         height="0.012"
-        color="#d8c7ad"
+        color="#3b82f6"
       ></a-box>
 
       <!-- Floating crystal centerpiece above the table (Easter Egg!) -->
@@ -1787,13 +2743,13 @@
           radius-inner="0.22"
           radius-outer="0.245"
           rotation="90 0 0"
-          color="#c9a454"
+          color="#3b82f6"
         ></a-ring>
         <a-ring
           radius-inner="0.22"
           radius-outer="0.245"
           rotation="0 0 0"
-          color="#c9a454"
+          color="#3b82f6"
         ></a-ring>
       </a-entity>
       <a-entity
@@ -1807,28 +2763,28 @@
         position="1.05 0.37 -3.42"
         radius="0.06"
         height="0.74"
-        color="#4a2d1d"
+        color="#1a1a2a"
         shadow="cast: true"
       ></a-cylinder>
       <a-cylinder
         position="-1.05 0.37 -3.42"
         radius="0.06"
         height="0.74"
-        color="#4a2d1d"
+        color="#1a1a2a"
         shadow="cast: true"
       ></a-cylinder>
       <a-cylinder
         position="1.05 0.37 -4.58"
         radius="0.06"
         height="0.74"
-        color="#4a2d1d"
+        color="#1a1a2a"
         shadow="cast: true"
       ></a-cylinder>
       <a-cylinder
         position="-1.05 0.37 -4.58"
         radius="0.06"
         height="0.74"
-        color="#4a2d1d"
+        color="#1a1a2a"
         shadow="cast: true"
       ></a-cylinder>
 
@@ -1839,7 +2795,7 @@
           width="0.56"
           depth="0.56"
           height="0.09"
-          color="#5b3623"
+          color="#1a1a2a"
           shadow="cast: true; receive: true"
         ></a-box>
         <a-box
@@ -1847,7 +2803,7 @@
           width="0.56"
           depth="0.09"
           height="0.74"
-          color="#5b3623"
+          color="#1a1a2a"
           shadow="cast: true"
         ></a-box>
         <a-box
@@ -1855,31 +2811,31 @@
           width="0.42"
           depth="0.42"
           height="0.03"
-          color="#9b2635"
+          color="#2563eb"
         ></a-box>
         <a-cylinder
           position="-0.21 0.23 0.21"
           radius="0.035"
           height="0.47"
-          color="#3b2417"
+          color="#0f0f1a"
         ></a-cylinder>
         <a-cylinder
           position="0.21 0.23 0.21"
           radius="0.035"
           height="0.47"
-          color="#3b2417"
+          color="#0f0f1a"
         ></a-cylinder>
         <a-cylinder
           position="-0.21 0.23 -0.21"
           radius="0.035"
           height="0.47"
-          color="#3b2417"
+          color="#0f0f1a"
         ></a-cylinder>
         <a-cylinder
           position="0.21 0.23 -0.21"
           radius="0.035"
           height="0.47"
-          color="#3b2417"
+          color="#0f0f1a"
         ></a-cylinder>
       </a-entity>
 
@@ -1889,7 +2845,7 @@
           width="0.56"
           depth="0.56"
           height="0.09"
-          color="#5b3623"
+          color="#1a1a2a"
           shadow="cast: true; receive: true"
         ></a-box>
         <a-box
@@ -1897,7 +2853,7 @@
           width="0.56"
           depth="0.09"
           height="0.74"
-          color="#5b3623"
+          color="#1a1a2a"
           shadow="cast: true"
         ></a-box>
         <a-box
@@ -1905,31 +2861,31 @@
           width="0.42"
           depth="0.42"
           height="0.03"
-          color="#9b2635"
+          color="#2563eb"
         ></a-box>
         <a-cylinder
           position="-0.21 0.23 0.21"
           radius="0.035"
           height="0.47"
-          color="#3b2417"
+          color="#0f0f1a"
         ></a-cylinder>
         <a-cylinder
           position="0.21 0.23 0.21"
           radius="0.035"
           height="0.47"
-          color="#3b2417"
+          color="#0f0f1a"
         ></a-cylinder>
         <a-cylinder
           position="-0.21 0.23 -0.21"
           radius="0.035"
           height="0.47"
-          color="#3b2417"
+          color="#0f0f1a"
         ></a-cylinder>
         <a-cylinder
           position="0.21 0.23 -0.21"
           radius="0.035"
           height="0.47"
-          color="#3b2417"
+          color="#0f0f1a"
         ></a-cylinder>
       </a-entity>
 
@@ -2001,7 +2957,7 @@
         position="0 0.84 -3.65"
         radius="0.2"
         height="0.025"
-        color="#ecdcbc"
+        color="#e0e4ea"
         shadow="cast: true"
       ></a-cylinder>
 
@@ -2010,7 +2966,7 @@
         position="0.84 0.87 -3.58"
         radius="0.08"
         height="0.16"
-        color="#734a2b"
+        color="#1a1a2a"
         shadow="cast: true"
       ></a-cylinder>
       <a-sphere
@@ -2072,13 +3028,13 @@
         position="-0.62 0.87 -4.38"
         radius="0.08"
         height="0.1"
-        color="#f5f0e6"
+        color="#f0f0f5"
         shadow="cast: true"
       ></a-cylinder>
       <a-sphere
         position="-0.62 0.93 -4.38"
         radius="0.08"
-        color="#f5f0e6"
+        color="#f0f0f5"
         theta-length="90"
       ></a-sphere>
       <a-entity position="-0.62 0.97 -4.38">
@@ -2097,7 +3053,7 @@
           position="0 0.84 0"
           radius="0.11"
           height="0.015"
-          color="#f5f0e6"
+          color="#f0f0f5"
           shadow="cast: true"
         ></a-cylinder>
         <a-cylinder
@@ -2121,7 +3077,7 @@
           position="0 0.84 0"
           radius="0.11"
           height="0.015"
-          color="#f5f0e6"
+          color="#f0f0f5"
           shadow="cast: true"
         ></a-cylinder>
         <a-cylinder
@@ -2170,7 +3126,7 @@
         width="0.14"
         depth="0.06"
         height="0.13"
-        color="#d4c3a8"
+        color="#e0e4ea"
         shadow="cast: true"
       ></a-box>
       <a-box
@@ -2178,7 +3134,7 @@
         width="0.12"
         depth="0.01"
         height="0.11"
-        color="#f5f0e6"
+        color="#f0f0f5"
       ></a-box>
 
       <!-- Two small spoons beside cups -->
@@ -2231,7 +3187,7 @@
         width="3.8"
         height="0.95"
         depth="0.55"
-        color="#6f462c"
+        color="#1a1a2a"
         shadow="receive: true"
       ></a-box>
       <a-box
@@ -2239,13 +3195,13 @@
         width="2.8"
         height="1.1"
         depth="0.06"
-        color="#ab8f6e"
+        color="#2a2a35"
       ></a-box>
       <a-plane
         position="0 1.55 -9.66"
         width="2.5"
         height="0.8"
-        color="#7e1f2b"
+        color="#1e3a5f"
       ></a-plane>
 
       <!-- Side sculptures for an extraordinary focal silhouette -->
@@ -2253,13 +3209,13 @@
         <a-cylinder
           radius="0.22"
           height="1.48"
-          color="#5d3a25"
+          color="#1a1a2a"
           shadow="cast: true"
         ></a-cylinder>
         <a-octahedron
           position="0 0.86 0"
           radius="0.24"
-          color="#d2b068"
+          color="#3b82f6"
           animation="property: rotation; to: 360 360 0; dur: 9000; loop: true; easing: linear"
         ></a-octahedron>
       </a-entity>
@@ -2268,16 +3224,461 @@
         <a-cylinder
           radius="0.22"
           height="1.48"
-          color="#5d3a25"
+          color="#1a1a2a"
           shadow="cast: true"
         ></a-cylinder>
         <a-octahedron
           position="0 0.86 0"
           radius="0.24"
-          color="#d2b068"
+          color="#3b82f6"
           animation="property: rotation; to: -360 -360 0; dur: 9000; loop: true; easing: linear"
         ></a-octahedron>
       </a-entity>
+
+      <!-- ===== Grandfather Clock ===== -->
+      <a-entity position="-6.2 0 -8.5">
+        <a-box
+          position="0 1.2 0"
+          width="0.55"
+          height="2.4"
+          depth="0.35"
+          color="#1a1a2a"
+          shadow="cast: true"
+        ></a-box>
+        <a-box
+          position="0 2.5 0"
+          width="0.65"
+          height="0.2"
+          depth="0.4"
+          color="#0f0f1a"
+        ></a-box>
+        <a-cone
+          position="0 2.72 0"
+          radius-bottom="0.32"
+          radius-top="0.05"
+          height="0.35"
+          color="#0f0f1a"
+        ></a-cone>
+        <a-cylinder
+          position="0 2.0 0.18"
+          radius="0.22"
+          height="0.02"
+          rotation="90 0 0"
+          color="#f0f0f5"
+        ></a-cylinder>
+        <a-ring
+          position="0 2.0 0.19"
+          radius-inner="0.19"
+          radius-outer="0.22"
+          color="#3b82f6"
+        ></a-ring>
+        <a-text
+          position="0 2.16 0.19"
+          value="12"
+          align="center"
+          color="#2a1a13"
+          width="0.5"
+        ></a-text>
+        <a-text
+          position="0.14 2.0 0.19"
+          value="3"
+          align="center"
+          color="#2a1a13"
+          width="0.5"
+        ></a-text>
+        <a-text
+          position="0 1.84 0.19"
+          value="6"
+          align="center"
+          color="#2a1a13"
+          width="0.5"
+        ></a-text>
+        <a-text
+          position="-0.14 2.0 0.19"
+          value="9"
+          align="center"
+          color="#2a1a13"
+          width="0.5"
+        ></a-text>
+        <a-box
+          position="0 2.06 0.2"
+          width="0.012"
+          height="0.14"
+          depth="0.005"
+          color="#1a1a1a"
+          animation="property: rotation; from: 0 0 0; to: 0 0 -360; dur: 43200000; loop: true; easing: linear"
+        ></a-box>
+        <a-box
+          position="0 2.04 0.21"
+          width="0.008"
+          height="0.18"
+          depth="0.005"
+          color="#2a2a2a"
+          animation="property: rotation; from: 0 0 0; to: 0 0 -360; dur: 3600000; loop: true; easing: linear"
+        ></a-box>
+        <a-plane
+          position="0 0.9 0.18"
+          width="0.4"
+          height="1.0"
+          color="#3a506b"
+          material="opacity: 0.3; transparent: true"
+        ></a-plane>
+        <a-entity position="0 1.35 0.18" pendulum="speed: 1800; angle: 12">
+          <a-cylinder
+            position="0 -0.3 0"
+            radius="0.006"
+            height="0.6"
+            color="#c0c0c0"
+          ></a-cylinder>
+          <a-sphere
+            position="0 -0.6 0"
+            radius="0.055"
+            color="#3b82f6"
+            material="metalness: 0.6; roughness: 0.3"
+          ></a-sphere>
+        </a-entity>
+        <a-box
+          position="0 0.06 0"
+          width="0.6"
+          height="0.12"
+          depth="0.38"
+          color="#0f0f1a"
+        ></a-box>
+      </a-entity>
+
+      <!-- ===== Bookshelf ===== -->
+      <a-entity position="6.2 0 -8.5">
+        <a-box
+          position="0 1.2 0"
+          width="1.2"
+          height="2.4"
+          depth="0.35"
+          color="#1a1a2a"
+          shadow="cast: true"
+        ></a-box>
+        <a-box
+          position="0 0.45 0.02"
+          width="1.1"
+          height="0.04"
+          depth="0.32"
+          color="#2a2a35"
+        ></a-box>
+        <a-box
+          position="0 1.0 0.02"
+          width="1.1"
+          height="0.04"
+          depth="0.32"
+          color="#2a2a35"
+        ></a-box>
+        <a-box
+          position="0 1.55 0.02"
+          width="1.1"
+          height="0.04"
+          depth="0.32"
+          color="#2a2a35"
+        ></a-box>
+        <a-box
+          position="0 2.1 0.02"
+          width="1.1"
+          height="0.04"
+          depth="0.32"
+          color="#2a2a35"
+        ></a-box>
+        <a-box
+          position="-0.4 0.7 0"
+          width="0.08"
+          height="0.46"
+          depth="0.22"
+          color="#8b0000"
+        ></a-box>
+        <a-box
+          position="-0.3 0.68 0"
+          width="0.07"
+          height="0.42"
+          depth="0.22"
+          color="#1565c0"
+        ></a-box>
+        <a-box
+          position="-0.21 0.7 0"
+          width="0.08"
+          height="0.46"
+          depth="0.22"
+          color="#2e7d32"
+        ></a-box>
+        <a-box
+          position="-0.12 0.67 0"
+          width="0.06"
+          height="0.4"
+          depth="0.22"
+          color="#ff8f00"
+        ></a-box>
+        <a-box
+          position="-0.04 0.7 0"
+          width="0.07"
+          height="0.46"
+          depth="0.22"
+          color="#6a1b9a"
+        ></a-box>
+        <a-box
+          position="0.05 0.69 0"
+          width="0.08"
+          height="0.44"
+          depth="0.22"
+          color="#c62828"
+        ></a-box>
+        <a-box
+          position="0.15 0.7 0"
+          width="0.06"
+          height="0.46"
+          depth="0.22"
+          color="#00695c"
+        ></a-box>
+        <a-box
+          position="0.23 0.68 0"
+          width="0.07"
+          height="0.42"
+          depth="0.22"
+          color="#4527a0"
+        ></a-box>
+        <a-box
+          position="0.32 0.7 0"
+          width="0.08"
+          height="0.46"
+          depth="0.22"
+          color="#bf360c"
+        ></a-box>
+        <a-box
+          position="0.42 0.69 0"
+          width="0.07"
+          height="0.44"
+          depth="0.22"
+          color="#1b5e20"
+        ></a-box>
+        <a-box
+          position="-0.38 1.25 0"
+          width="0.07"
+          height="0.46"
+          depth="0.22"
+          color="#e65100"
+        ></a-box>
+        <a-box
+          position="-0.28 1.27 0"
+          width="0.08"
+          height="0.5"
+          depth="0.22"
+          color="#283593"
+        ></a-box>
+        <a-box
+          position="-0.18 1.24 0"
+          width="0.06"
+          height="0.44"
+          depth="0.22"
+          color="#ad1457"
+        ></a-box>
+        <a-box
+          position="-0.1 1.26 0"
+          width="0.07"
+          height="0.48"
+          depth="0.22"
+          color="#2e7d32"
+        ></a-box>
+        <a-box
+          position="0 1.25 0"
+          width="0.08"
+          height="0.46"
+          depth="0.22"
+          color="#5d4037"
+        ></a-box>
+        <a-box
+          position="0.1 1.27 0"
+          width="0.06"
+          height="0.5"
+          depth="0.22"
+          color="#0277bd"
+        ></a-box>
+        <a-box
+          position="0.18 1.24 0"
+          width="0.07"
+          height="0.44"
+          depth="0.22"
+          color="#9e9d24"
+        ></a-box>
+        <a-box
+          position="0.27 1.26 0"
+          width="0.08"
+          height="0.48"
+          depth="0.22"
+          color="#880e4f"
+        ></a-box>
+        <a-box
+          position="0.37 1.25 0"
+          width="0.07"
+          height="0.46"
+          depth="0.22"
+          color="#37474f"
+        ></a-box>
+        <a-box
+          position="-0.35 1.8 0"
+          width="0.08"
+          height="0.46"
+          depth="0.22"
+          color="#4a148c"
+        ></a-box>
+        <a-box
+          position="-0.24 1.78 0"
+          width="0.07"
+          height="0.42"
+          depth="0.22"
+          color="#b71c1c"
+        ></a-box>
+        <a-box
+          position="-0.15 1.8 0"
+          width="0.08"
+          height="0.46"
+          depth="0.22"
+          color="#004d40"
+        ></a-box>
+        <a-box
+          position="-0.05 1.79 0"
+          width="0.06"
+          height="0.44"
+          depth="0.22"
+          color="#e65100"
+        ></a-box>
+        <a-box
+          position="0.04 1.8 0"
+          width="0.07"
+          height="0.46"
+          depth="0.22"
+          color="#1a237e"
+        ></a-box>
+        <a-box
+          position="0.13 1.78 0"
+          width="0.08"
+          height="0.42"
+          depth="0.22"
+          color="#33691e"
+        ></a-box>
+        <a-box
+          position="0.23 1.8 0"
+          width="0.06"
+          height="0.46"
+          depth="0.22"
+          color="#ff6f00"
+        ></a-box>
+        <a-box
+          position="0.32 1.79 0"
+          width="0.07"
+          height="0.44"
+          depth="0.22"
+          color="#311b92"
+        ></a-box>
+      </a-entity>
+
+      <!-- ===== Picture Frames with Geometric Art ===== -->
+      <a-entity position="-8.8 2.2 -3" rotation="0 90 0">
+        <a-box
+          position="0 0 0"
+          width="1.2"
+          height="0.9"
+          depth="0.04"
+          color="#1a1a2a"
+        ></a-box>
+        <a-plane
+          position="0 0 0.025"
+          width="1.0"
+          height="0.7"
+          color="#1a2a3a"
+        ></a-plane>
+        <a-ring
+          position="0 0 0.03"
+          radius-inner="0.12"
+          radius-outer="0.2"
+          color="#3b82f6"
+        ></a-ring>
+        <a-ring
+          position="0.2 -0.1 0.03"
+          radius-inner="0.08"
+          radius-outer="0.14"
+          color="#60a5fa"
+        ></a-ring>
+      </a-entity>
+      <a-entity position="-8.8 2.2 -6" rotation="0 90 0">
+        <a-box
+          position="0 0 0"
+          width="1.0"
+          height="1.0"
+          depth="0.04"
+          color="#0f0f1a"
+        ></a-box>
+        <a-plane
+          position="0 0 0.025"
+          width="0.8"
+          height="0.8"
+          color="#2a1a3a"
+        ></a-plane>
+        <a-octahedron
+          position="0 0 0.04"
+          radius="0.15"
+          color="#3b82f6"
+          rotation="0 45 0"
+        ></a-octahedron>
+      </a-entity>
+      <a-entity position="8.8 2.2 -3" rotation="0 -90 0">
+        <a-box
+          position="0 0 0"
+          width="1.2"
+          height="0.9"
+          depth="0.04"
+          color="#1a1a2a"
+        ></a-box>
+        <a-plane
+          position="0 0 0.025"
+          width="1.0"
+          height="0.7"
+          color="#1e3a2a"
+        ></a-plane>
+        <a-box
+          position="-0.15 0.05 0.03"
+          width="0.2"
+          height="0.2"
+          depth="0.005"
+          color="#3b82f6"
+          rotation="0 0 45"
+        ></a-box>
+        <a-box
+          position="0.15 -0.05 0.03"
+          width="0.15"
+          height="0.15"
+          depth="0.005"
+          color="#60a5fa"
+          rotation="0 0 30"
+        ></a-box>
+      </a-entity>
+      <a-entity position="8.8 2.2 -6" rotation="0 -90 0">
+        <a-box
+          position="0 0 0"
+          width="1.0"
+          height="1.0"
+          depth="0.04"
+          color="#0f0f1a"
+        ></a-box>
+        <a-plane
+          position="0 0 0.025"
+          width="0.8"
+          height="0.8"
+          color="#3a2a1a"
+        ></a-plane>
+        <a-torus
+          position="0 0 0.04"
+          radius="0.15"
+          radius-tubular="0.02"
+          color="#3b82f6"
+        ></a-torus>
+      </a-entity>
+
+      <!-- ===== Floating Dust Motes ===== -->
+      <a-entity dust-motes></a-entity>
 
       <!-- ===== Steam rising from cups ===== -->
       <a-entity position="-0.9 0.96 -4" steam-effect></a-entity>
@@ -2291,7 +3692,7 @@
         rotation="-90 0 0"
         radius-inner="0.18"
         radius-outer="0.28"
-        color="#ffde94"
+        color="#93c5fd"
         material="opacity:0.5; transparent:true"
         animation="property: material.opacity; from:0.3; to:0.7; dir:alternate; loop:true; dur:1200"
       ></a-ring>
@@ -2302,7 +3703,7 @@
         rotation="-90 0 0"
         radius-inner="0.18"
         radius-outer="0.28"
-        color="#ffde94"
+        color="#93c5fd"
         material="opacity:0.5; transparent:true"
         animation="property: material.opacity; from:0.3; to:0.7; dir:alternate; loop:true; dur:1200"
       ></a-ring>
@@ -2313,7 +3714,7 @@
         rotation="-90 0 0"
         radius-inner="0.18"
         radius-outer="0.28"
-        color="#ffcc77"
+        color="#60a5fa"
         material="opacity:0.5; transparent:true"
         animation="property: material.opacity; from:0.3; to:0.7; dir:alternate; loop:true; dur:1200"
       ></a-ring>
@@ -2324,7 +3725,7 @@
         rotation="-90 0 0"
         radius-inner="0.18"
         radius-outer="0.28"
-        color="#aadcff"
+        color="#60a5fa"
         material="opacity:0.5; transparent:true"
         animation="property: material.opacity; from:0.3; to:0.7; dir:alternate; loop:true; dur:1200"
       ></a-ring>
@@ -2335,7 +3736,7 @@
         rotation="-90 0 0"
         radius-inner="0.18"
         radius-outer="0.28"
-        color="#ff9a32"
+        color="#3b82f6"
         material="opacity:0.5; transparent:true"
         animation="property: material.opacity; from:0.3; to:0.7; dir:alternate; loop:true; dur:1200"
       ></a-ring>
